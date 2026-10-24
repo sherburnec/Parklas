@@ -38,11 +38,21 @@ Never edit `segments.geojson`. It is the street list and must not change. Every 
 - **A block under 20 m is drawn only if it has a rule row.** Short connecting blocks between two roads are left off the map unless you give them a rule. Their rows still work as normal.
 - **Inner-facing sides are not drawn on the map, but they still appear in the click-through list.** Where two roads run side by side, such as the two halves of a divided road, the sides that face each other are skipped because the bands would cross. Write their rows as you would for any other side.
 
+## Authoring page: find a segment_id and its sides
+
+The authoring page is a separate map for data entry. The public page does not link to it.
+
+1. Run `npm run dev` and open `http://localhost:5173/authoring.html` (use the port Vite prints). On the deployed site it is `authoring.html` next to the main page, but nothing links to it.
+2. Zoom in. Every block has an arrow showing its direction, a blue line with an `L` on its left and an orange line with an `R` on its right, both read facing along the arrow.
+3. Click a block. The panel shows its street and cross streets and its `segment_id`, and copies the `segment_id` to the clipboard. Paste it into `rules.csv`, and use `L` or `R` for the side you saw.
+
+The page draws the sides with the same code as `npm run build:data`, so the side you see marked `L` is the side the build draws for an `L` row, including on a block whose direction runs the other way round.
+
 ## 1. Find a segment_id
 
 A segment is one block of one street, from one cross street to the next. Every block has a `segment_id`.
 
-The map does not show IDs yet, so look it up:
+The easiest way is the authoring page (next section). To look it up in the file instead:
 
 1. Open `data/burbank/segments.geojson` in VS Code.
 2. Press Ctrl+F and type the street name, for example `West Magnolia Boulevard`.

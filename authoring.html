@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Authoring map</title>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body { display: flex; flex-direction: column; font: 14px system-ui, sans-serif; }
+      #app { flex: 1; min-height: 0; position: relative; }
+      #data-banner { padding: 6px 12px; text-align: center; font-weight: 600; color: #5c3b00; background: #ffd966; }
+      #key, #detail {
+        position: absolute; z-index: 1; padding: 8px 12px; background: rgba(255, 255, 255, 0.95);
+        border-radius: 4px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      }
+      #key { left: 10px; bottom: 28px; }
+      #detail { left: 10px; top: 10px; max-width: 320px; }
+      #detail[hidden] { display: none; }
+      #detail h1 { margin: 0 0 6px; font-size: 14px; }
+      #detail code { display: block; margin: 4px 0; padding: 4px; background: #eee; word-break: break-all; }
+      .sw { display: inline-block; width: 14px; height: 4px; margin-right: 6px; vertical-align: middle; }
+      .sw.l { background: #1f6fd1; }
+      .sw.r { background: #e07b00; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="key">
+        <div><span class="sw l"></span>L: left, facing along the arrow</div>
+        <div><span class="sw r"></span>R: right, facing along the arrow</div>
+        <div>Click a segment to copy its segment_id</div>
+      </div>
+      <div id="detail" hidden></div>
+    </div>
+    <script type="module" src="/src/authoring/main.ts"></script>
+  </body>
+</html>

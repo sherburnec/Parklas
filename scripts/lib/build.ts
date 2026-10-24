@@ -3,9 +3,11 @@ import { parseCsv } from './validate.ts';
 import type { SegmentCollection } from './segments.ts';
 
 export type { SegmentCollection };
+import { sideToOffset, type Offset, type Side } from './side-offset.ts';
+
+export { sideToOffset };
+export type { Offset, Side };
 export type Line = [number, number][];
-export type Side = 'L' | 'R';
-export type Offset = 'left' | 'right';
 
 export interface RuleRow {
   segment_id: string;
@@ -35,17 +37,6 @@ export interface BuiltLayers {
   restrictions: SideCollection;
   curbColors: SideCollection;
   coverage: { city_id: string; segment_ids: string[] };
-}
-
-/**
- * Which way a side is offset. "L" and "R" are left and right when facing along the segment's direction (first to
- * last coordinate in segments.geojson), which is also how MapLibre's line-offset reads: negative is left, positive right.
- * Anything else, compass letters included, is an error, not a guess.
- */
-export function sideToOffset(side: Side): Offset {
-  if (side === 'L') return 'left';
-  if (side === 'R') return 'right';
-  throw new Error(`side ${JSON.stringify(side)} must be L or R (left or right facing along the segment's direction)`);
 }
 
 const empty = (): SideCollection => ({ type: 'FeatureCollection', features: [] });
