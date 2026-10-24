@@ -99,7 +99,7 @@ Data is GeoJSON, one file per layer, with one record per curb side. Because the 
 | Permit zones | Polygon | permit code, name, city |
 | Street segments (base) | LineString | segment ID, street name, cross streets, city; from OpenStreetMap, frozen |
 
-**Geometry.** Each line is the street centerline for one block, taken from OpenStreetMap and frozen in a segments file with a stable segment ID. The app draws it offset toward the record's side (N, S, E or W), and offsets each layer by a different distance so the bands sit side by side. If the data later arrives already positioned along the curb, the offset step is switched off.
+**Geometry.** Each line is the street centerline for one block, taken from OpenStreetMap and frozen in a segments file with a stable segment ID. The app draws it offset toward the record's side (L or R, left or right when facing along the segment's direction in the frozen file), and offsets each layer by a different distance so the bands sit side by side. If the data later arrives already positioned along the curb, the offset step is switched off.
 
 **Schedules.** A schedule is a list of windows. Each window has a list of weekdays, a start time and an end time in 24-hour format. A window may cross midnight, so 18:00 to 06:00 on Monday runs into Tuesday morning. A null schedule means the rule is always in effect. A window may also list weeks of the month (1 to 5); absent means every week. Burbank sweeping is day-by-day and leaves it empty, but other cities will need it, so the engine supports it from Phase 1. Holidays are out of scope for now.
 

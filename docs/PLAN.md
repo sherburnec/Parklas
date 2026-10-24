@@ -89,7 +89,7 @@ App state (day, hour, toggles) lives in memory and the URL, never browser storag
 
 - **MapLibre GL JS** draws parallel side bands with its built-in line offset and handles a full city of lines. Rejected: Leaflet, which needs a plugin for offsets and slows with many lines.
 - **Rules keyed to OSM blocks, authored as CSV.** You type rows instead of drawing lines, and partial coverage is explicit. Rejected: hand-drawn per-side LineStrings, which multiply effort and errors.
-- **Side stored as N/S/E/W, converted at build time** to a left or right offset using the block's direction. Rejected: storing left/right directly, which breaks if a block's direction is reversed.
+- **Side stored as L/R, relative to the segment's direction** (first to last coordinate in the frozen segments file, facing along it). It maps straight onto the map's line offset, and needs no compass or grid lookup. Rejected: N/S/E/W, because Burbank's grid is rotated about 45 degrees from compass, so every rule would depend on an angle and tie-break rule (M1-3 spike, decision 1). The earlier objection to L/R, that it breaks if a block's direction is reversed, does not apply because the segments file is frozen; a deliberate re-extraction must report any segment whose direction changed, since its L/R rows would flip. Cardinal labels (city-grid) are derived for display only.
 - **Frozen segments file.** Re-extracting OSM could renumber blocks and orphan your rows, so re-extraction is a deliberate step that reports changed IDs. Rejected: fetching OSM live on each build.
 - **Prebuilt files on GitHub Pages.** No server, free, and the loader is the only thing Phase 2 replaces. Rejected: a database now, which adds hosting with no Phase 1 need.
 
@@ -109,6 +109,8 @@ App state (day, hour, toggles) lives in memory and the URL, never browser storag
 | M2-3 ✅ | Validator CLI with file, row and reason output | M2-2 | S | A seeded bad row is reported with its row number | DM-3 |
 | M2-4 ✅ | Build script: CSV + segments to per-layer GeoJSON, side offsets, coverage file | M1-1, M2-3 | L | Sample rows yield valid GeoJSON with correct sides on N/S and E/W streets | FR-11, DM-2 |
 | M2-5 ✅ | Authoring templates and README: CSV headers, polygon how-to, example rows | M2-4 | S | You can add one block of rules using only the README | DM-3 |
+| M2-6 | Switch `side` from N/S/E/W to L/R (relative to segment direction): schema, validator, build script, sample generator, templates, tests. Add a build check that reports any segment whose direction differs from the frozen file | M2-4, M2-5, TD-2 | M | `validate` rejects N, S, E, W; sample rows yield bands on the correct side of streets running in all directions, including reversed segments; sample data regenerated; `npm test` and `npm run build` pass | FR-11, DM-2 |
+| M2-7 | Authoring map view: a map page (own entry point, not part of the public app) that shows every segment with its `segment_id`, an arrow for its direction, and its `L` and `R` sides marked, with click-to-copy of the `segment_id`. Data comes through the data-loader only | M1-2, M2-6, M3-1 | M | Clicking a segment shows its `segment_id` and marks which side is `L` and which is `R`, and these agree with the sides the build script draws for the same segment, including a reversed one; `npm test` and `npm run build` pass | DM-3, FR-11 |
 | TD-1 ✅ | Sample dataset `data/burbank-sample/` (30 connected segments, empty rule files), `DATA_SET` setting for validate, build:data and the loader, sample banner | M2-4 | S | `validate` and `build:data` pass on the empty sample set and the banner shows | Testing |
 | TD-2 ✅ | Sparse citywide sample data: made-up rules on a spread of segments across all of Burbank (about 1 in 15), all four rule layers, plus a few `SAMPLE-` zoning and `DEMO-` permit polygons across the city. Replaces the 30-segment `area.json` limit with the whole segments file. Generator script, seeded so output is repeatable | TD-1, M2-4 | M | `validate` and `build:data` pass on the sample set; every rule layer has rows in at least 4 distinct parts of the city; unmapped blocks still outnumber mapped ones | Testing |
 | M3-1 ✅ | Data loader, single entry point. CI runs `npm run build:data` for every city folder under `data/` (generated `public/` is gitignored); the loader takes a city_id and reads `data/<city_id>/` paths, so a new city needs only a data folder | M2-4 | S | A search finds no data fetch outside the loader; the deployed site serves the built files for every city folder | AR-3 |
@@ -130,9 +132,10 @@ App state (day, hour, toggles) lives in memory and the URL, never browser storag
 | M5-2 | Last-updated date and reference-tool label | M3-1 | S | Both visible on load | FR-13 |
 | M5-3 | Basemap isolation check | M3-2 | S | Replacing the basemap module needs no change elsewhere | AR-1 |
 | M5-4 | Storage audit | M5-1 | S | No feature breaks with browser storage blocked | AR-4 |
-| M6-1 | Pilot data: one dense area, all layers | M2-5 | M | Area passes the validator and every layer has rows | Phasing |
+| M6-1 | Pilot data: one dense area, all layers | M2-5, M2-7 | M | Area passes the validator and every layer has rows | Phasing |
 | M6-2 | Accuracy walk: check 20 pilot curb sides against signs | M6-1 | M | 20 of 20 match or are corrected | Risk 1 |
-| M6-3 | Phase 1 review and PRD handoff update | all | S | Exit criteria in the PRD are ticked or explained | Phasing |
+| M6-3 | Phase 1 review and PRD handoff update | all, including M6-4 | S | Exit criteria in the PRD are ticked or explained | Phasing |
+| M6-4 | Revisit `docs/data-dependent-decisions.md`: run each check on the pilot data and the citywide segments file, then set every row to Confirmed or Changed with a line of evidence. Update `docs/spike-notes.md` and the build script's tests for any value that changed | M6-1, M6-2 | S | No row in the file is still Set or Open; every changed value is updated in the spike notes and the build script, and `npm test` and `npm run build` pass | FR-9, FR-11 |
 
 No Phase 1 requirement is left without a task. Beats, officer location and tickets have no tasks because they are Phase 2.
 
@@ -236,7 +239,7 @@ TypeScript, Vite, MapLibre GL JS, Vitest, GitHub Actions to GitHub Pages. No ser
 ## Data
 - City data in data/<city_id>/. Burbank time zone: America/Los_Angeles.
 - segments.geojson is frozen. Never regenerate it unless the task says so.
-- Rule rows are CSV keyed by segment_id and side (N/S/E/W).
+- Rule rows are CSV keyed by segment_id and side (L/R). L and R are relative to the segment's direction (first to last coordinate in segments.geojson), facing along it. Never compass directions.
 
 ## Working rules
 - Write tests first for schedule-engine and build scripts.

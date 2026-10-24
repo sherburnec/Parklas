@@ -41,7 +41,7 @@ The map does not show IDs yet, so look it up:
 2. Press Ctrl+F and type the street name, for example `West Magnolia Boulevard`.
 3. Each line is one block. Find the one whose `from_street` and `to_street` are the cross streets you want. Copy its `segment_id`, for example `burbank-118435906-123108474`.
 
-One block, two sides: each side gets its own row.
+One block, two sides (`L` and `R`): each side gets its own row. To tell which is which, note the first and last coordinate of the segment's line: stand at the first and face the last, and `L` is on your left.
 
 ## 2. What each column means
 
@@ -50,7 +50,7 @@ One block, two sides: each side gets its own row.
 | Column | What to write |
 | --- | --- |
 | `segment_id` | The block, copied exactly from step 1. |
-| `side` | `N`, `S`, `E` or `W`: the side of the street the rule is on. Use `N` or `S` on an east-west street, `E` or `W` on a north-south street. Any other choice is rejected when you build. |
+| `side` | `L` or `R`: the side of the block the rule is on, as seen facing along the segment's direction (from the first coordinate of its line in `segments.geojson` to the last). This is not a compass or city-grid direction. Any other value is rejected when you build. |
 | `layer` | `sweeping`, `timed_parking`, `restrictions` or `curb_color`. |
 | `type` | Only for `restrictions`: `no_parking`, `no_standing` or `no_stopping`. Leave empty for the other layers. A `no_stopping` row is what draws the strongest "no stopping, standing or parking" style. |
 | `limit_minutes` | Only for `timed_parking`: the limit in minutes. 2 hours is `120`. Leave empty otherwise. |
