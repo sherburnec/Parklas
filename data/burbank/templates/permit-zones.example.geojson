@@ -1,0 +1,13 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "permit_code": "A", "name": "Permit Zone A", "city_id": "burbank" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-118.3200, 34.1800], [-118.3150, 34.1800], [-118.3150, 34.1850], [-118.3200, 34.1850], [-118.3200, 34.1800]]]
+      }
+    }
+  ]
+}

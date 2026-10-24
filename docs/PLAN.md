@@ -108,7 +108,7 @@ App state (day, hour, toggles) lives in memory and the URL, never browser storag
 | M2-2 ✅ | JSON Schemas for every file, including city config (time zone, zoning map) | M0-1 | M | Schemas cover every PRD data-model field | DM-2 |
 | M2-3 ✅ | Validator CLI with file, row and reason output | M2-2 | S | A seeded bad row is reported with its row number | DM-3 |
 | M2-4 ✅ | Build script: CSV + segments to per-layer GeoJSON, side offsets, coverage file | M1-1, M2-3 | L | Sample rows yield valid GeoJSON with correct sides on N/S and E/W streets | FR-11, DM-2 |
-| M2-5 | Authoring templates and README: CSV headers, polygon how-to, example rows | M2-4 | S | You can add one block of rules using only the README | DM-3 |
+| M2-5 ✅ | Authoring templates and README: CSV headers, polygon how-to, example rows | M2-4 | S | You can add one block of rules using only the README | DM-3 |
 | M3-1 | Data loader, single entry point. CI runs `npm run build:data` for every city folder under `data/` (generated `public/` is gitignored); the loader takes a city_id and reads `data/<city_id>/` paths, so a new city needs only a data folder | M2-4 | S | A search finds no data fetch outside the loader; the deployed site serves the built files for every city folder | AR-3 |
 | M3-2 | Not-yet-mapped style from coverage file | M1-2, M3-1 | S | Unmapped blocks show hatched; clicking says "not yet mapped" | FR-12 |
 | M3-3 | Zoning polygons, category colors from code map | M3-1 | S | Each zone code shows its category color | FR-3 |

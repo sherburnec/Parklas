@@ -1,0 +1,7 @@
+{
+  "city_id": "burbank",
+  "colors": {
+    "red": { "label": "Red: no stopping", "hex": "#D32F2F", "time_limit_minutes": null, "default_schedule": null },
+    "white": { "label": "White: passenger loading", "hex": "#F5F5F5", "time_limit_minutes": 5, "default_schedule": null }
+  }
+}

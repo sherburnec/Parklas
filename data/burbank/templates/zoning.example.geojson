@@ -1,0 +1,13 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "zone_code": "R-1", "category": "residential", "name": "Single Family Residential", "city_id": "burbank" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-118.3100, 34.1800], [-118.3050, 34.1800], [-118.3050, 34.1850], [-118.3100, 34.1850], [-118.3100, 34.1800]]]
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "city_id": "burbank",
+  "categories": {
+    "residential": { "label": "Residential", "hex": "#F4D35E" },
+    "commercial": { "label": "Commercial", "hex": "#EE6C4D" }
+  },
+  "zone_codes": {
+    "R-1": "residential",
+    "C-3": "commercial"
+  }
+}
