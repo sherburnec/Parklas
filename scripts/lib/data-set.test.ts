@@ -49,6 +49,7 @@ describe('loadCityFiles', () => {
     expect(Object.keys(loadCityFiles(dir, 'burbank')).sort()).toEqual(['city.json', 'segments.geojson']);
   });
 
+
   it('supplies segments.geojson from the source city to a sample folder without a copy', () => {
     const files = loadCityFiles(dir, 'burbank-sample');
     expect(files['city.json']).toBe('{"sample":true}');
@@ -58,6 +59,19 @@ describe('loadCityFiles', () => {
   it("does not override a sample folder's own segments file", () => {
     writeFileSync(join(dir, 'burbank-sample', 'segments.geojson'), 'own');
     expect(loadCityFiles(dir, 'burbank-sample')['segments.geojson']).toBe('own');
+  });
+
+  it('supplies trim.json from the source city the same way, and copes with the source not having one yet', () => {
+    writeFileSync(join(dir, 'burbank', 'trim.json'), '{"city_id":"burbank","segments":{}}');
+    expect(loadCityFiles(dir, 'burbank-sample')['trim.json']).toBe('{"city_id":"burbank","segments":{}}');
+    rmSync(join(dir, 'burbank', 'trim.json'));
+    expect('trim.json' in loadCityFiles(dir, 'burbank-sample')).toBe(false);
+  });
+
+  it("does not override a sample folder's own trim.json", () => {
+    writeFileSync(join(dir, 'burbank', 'trim.json'), 'source');
+    writeFileSync(join(dir, 'burbank-sample', 'trim.json'), 'own');
+    expect(loadCityFiles(dir, 'burbank-sample')['trim.json']).toBe('own');
   });
 
   it('throws when the source city has no segments file', () => {

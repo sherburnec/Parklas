@@ -18,6 +18,7 @@ const required = (folder: string) => ({
   [`/data/${folder}/restrictions.geojson`]: empty,
   [`/data/${folder}/curb-colors.geojson`]: empty,
   [`/data/${folder}/coverage.json`]: { city_id: folder, segment_ids: ['a'] },
+  [`/data/${folder}/trim.json`]: { city_id: folder, segments: { a: { trim_start_m: 3.4, trim_end_m: 0, sliver: false, inner_L: true, inner_R: false } } },
 });
 
 describe('loadCity', () => {
@@ -26,6 +27,7 @@ describe('loadCity', () => {
     const data = await loadCity('burbank', { dataSet: 'sample', baseUrl: '/data', fetcher: fakeFetcher(required('burbank-sample'), seen) });
     expect(data.city.time_zone).toBe('America/Los_Angeles');
     expect(data.coverage.segment_ids).toEqual(['a']);
+    expect(data.trim.segments.a).toMatchObject({ trim_start_m: 3.4, inner_L: true });
     expect(data.zoning).toBeNull();
     expect(data.curbColorConfig).toBeNull();
     expect(seen.every((u) => u.startsWith('/data/burbank-sample/'))).toBe(true);
@@ -41,6 +43,12 @@ describe('loadCity', () => {
     const files = required('burbank');
     delete files['/data/burbank/coverage.json'];
     await expect(loadCity('burbank', { dataSet: 'real', baseUrl: '/data', fetcher: fakeFetcher(files) })).rejects.toThrow(/burbank\/coverage\.json.*404/);
+  });
+
+  it('fails with the url when trim.json is missing', async () => {
+    const files = required('burbank');
+    delete files['/data/burbank/trim.json'];
+    await expect(loadCity('burbank', { dataSet: 'real', baseUrl: '/data', fetcher: fakeFetcher(files) })).rejects.toThrow(/burbank\/trim\.json.*404/);
   });
 
   it('treats an HTML answer for an optional file as absent', async () => {

@@ -11,7 +11,9 @@ export type {
   Schedule,
   ScheduleWindow,
   SegmentCollection,
+  SegmentTrim,
   Side,
   SideCollection,
+  TrimData,
   ZoningCategoriesConfig,
 } from './load-city';

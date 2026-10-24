@@ -43,6 +43,22 @@ export interface Coverage {
   segment_ids: string[];
 }
 
+/** Band geometry flags per segment, from data/<city_id>/trim.json (task M2-8). */
+export interface SegmentTrim {
+  trim_start_m: number;
+  trim_end_m: number;
+  /** Block under 20 m: drawn only if it has a rule row. */
+  sliver: boolean;
+  /** Another block lies close beside this side, so it is not drawn (it still lists in the click-through). */
+  inner_L: boolean;
+  inner_R: boolean;
+}
+
+export interface TrimData {
+  city_id: string;
+  segments: Record<string, SegmentTrim>;
+}
+
 export interface CityData {
   cityId: string;
   city: CityConfig;
@@ -52,6 +68,7 @@ export interface CityData {
   restrictions: SideCollection;
   curbColors: SideCollection;
   coverage: Coverage;
+  trim: TrimData;
   /** Absent when the city has no polygons or config of this kind yet. */
   zoning: PolygonCollection | null;
   permitZones: PolygonCollection | null;
@@ -90,7 +107,7 @@ export async function loadCity(cityId: string, options: LoadOptions = {}): Promi
   const required = <T>(file: string) => getJson<T>(fetcher, url(file), false) as Promise<T>;
   const optional = <T>(file: string) => getJson<T>(fetcher, url(file), true);
 
-  const [city, segments, sweeping, timedParking, restrictions, curbColors, coverage, zoning, permitZones, curbColorConfig, zoningCategories] =
+  const [city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, zoning, permitZones, curbColorConfig, zoningCategories] =
     await Promise.all([
       required<CityConfig>('city.json'),
       required<SegmentCollection>('segments.geojson'),
@@ -99,11 +116,12 @@ export async function loadCity(cityId: string, options: LoadOptions = {}): Promi
       required<SideCollection>('restrictions.geojson'),
       required<SideCollection>('curb-colors.geojson'),
       required<Coverage>('coverage.json'),
+      required<TrimData>('trim.json'),
       optional<PolygonCollection>('zoning.geojson'),
       optional<PolygonCollection>('permit-zones.geojson'),
       optional<CurbColorsConfig>('curb-colors.json'),
       optional<ZoningCategoriesConfig>('zoning-categories.json'),
     ]);
 
-  return { cityId, city, segments, sweeping, timedParking, restrictions, curbColors, coverage, zoning, permitZones, curbColorConfig, zoningCategories };
+  return { cityId, city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, zoning, permitZones, curbColorConfig, zoningCategories };
 }

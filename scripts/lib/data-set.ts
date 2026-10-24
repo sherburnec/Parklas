@@ -3,7 +3,8 @@
 //
 // DATA_SET=sample (the default) uses the folders named <city_id>-sample, such as data/burbank-sample/.
 // DATA_SET=real uses every other folder. A sample folder has no segments.geojson of its own: it is
-// read from the source city's folder, so the frozen file is never copied.
+// read from the source city's folder, so the frozen file is never copied. trim.json, which is generated
+// from it, is borrowed the same way.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -45,6 +46,11 @@ export function loadCityFiles(dataDir: string, city: string): Record<string, str
     const path = resolve(dataDir, source, 'segments.geojson');
     if (!existsSync(path)) throw new Error(`data/${city} borrows its streets from data/${source}/segments.geojson, which does not exist`);
     files['segments.geojson'] = readFileSync(path, 'utf8');
+  }
+  // trim.json is borrowed the same way. build:data writes it for the real city, so it may not exist yet.
+  if (source !== null && !('trim.json' in files)) {
+    const path = resolve(dataDir, source, 'trim.json');
+    if (existsSync(path)) files['trim.json'] = readFileSync(path, 'utf8');
   }
   return files;
 }

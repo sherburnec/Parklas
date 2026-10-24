@@ -15,6 +15,7 @@ const SCHEMA_BY_FILE: Record<string, string> = {
   'permit-zones.geojson': 'permit-zones',
   'curb-colors.json': 'curb-colors-config',
   'zoning-categories.json': 'zoning-categories-config',
+  'trim.json': 'trim',
 };
 
 const RULE_COLUMNS = ['segment_id', 'city_id', 'side', 'layer', 'type', 'limit_minutes', 'permit_code', 'color_key', 'schedule'];
@@ -179,6 +180,16 @@ export function validateCity(files: Record<string, string>, schemas: object[]): 
   const sample = String(parsed['city.json']?.city_id ?? '').endsWith('-sample');
   const colorKeys = new Set<string>(Object.keys(parsed['curb-colors.json']?.colors ?? {}));
   const hasColors = 'curb-colors.json' in parsed;
+
+  // trim.json is generated from segments.geojson, so it must list exactly the same blocks.
+  if (parsed['trim.json']?.segments && parsed['segments.geojson']) {
+    const trimmed = new Set(Object.keys(parsed['trim.json'].segments));
+    const missing = [...segmentIds].filter((id) => !trimmed.has(id));
+    const extra = [...trimmed].filter((id) => !segmentIds.has(id));
+    const hint = 'trim.json is out of date; run build:data for the real city folder to regenerate it';
+    if (missing.length) add('trim.json', null, `No entry for ${missing.length} segment${missing.length === 1 ? '' : 's'} (first: "${missing[0]}"); ${hint}`);
+    if (extra.length) add('trim.json', null, `${extra.length} entr${extra.length === 1 ? 'y is' : 'ies are'} not in segments.geojson (first: "${extra[0]}"); ${hint}`);
+  }
 
   // Zoning: every zone code maps to a category that exists, and records agree with the map.
   const cfg = parsed['zoning-categories.json'];

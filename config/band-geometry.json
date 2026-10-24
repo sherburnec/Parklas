@@ -1,0 +1,13 @@
+{
+  "description": "Side band geometry shared by the build script (trim.json) and the layers. Pixel values are at zoom 17; bands scale 2x per zoom between z15 and z19, so they stay a fixed distance from the street in metres. Changing any value means re-running build:data, since trim.json depends on them. See docs/spike-notes.md.",
+  "first_offset_px": 2,
+  "offset_step_px": 2,
+  "width_px": 1,
+  "min_width_px": 2,
+  "band_count": 3,
+  "metres_per_px_z17": 0.49,
+  "trim_cap_share": 0.35,
+  "sliver_max_m": 20,
+  "inner_max_distance_m": 10,
+  "inner_max_angle_deg": 25
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parklas.local/schemas/trim.schema.json",
+  "title": "Band geometry flags",
+  "description": "data/<city_id>/trim.json. Written by build:data from the frozen segments.geojson and config/band-geometry.json; never edited by hand. One entry per segment_id: how far to cut each side band at both ends, whether the block is a sliver, and which sides face another block closely.",
+  "type": "object",
+  "required": ["city_id", "segments"],
+  "additionalProperties": false,
+  "properties": {
+    "city_id": { "type": "string", "pattern": "^[a-z0-9_-]+$" },
+    "segments": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/entry" }
+    }
+  },
+  "definitions": {
+    "entry": {
+      "type": "object",
+      "required": ["trim_start_m", "trim_end_m", "sliver", "inner_L", "inner_R"],
+      "additionalProperties": false,
+      "properties": {
+        "trim_start_m": { "type": "number", "minimum": 0, "description": "Metres to cut from the first-coordinate end of each band." },
+        "trim_end_m": { "type": "number", "minimum": 0, "description": "Metres to cut from the last-coordinate end of each band." },
+        "sliver": { "type": "boolean", "description": "Block shorter than 20 m: drawn only if it has a rule row." },
+        "inner_L": { "type": "boolean", "description": "Another block lies close beside the left side, so it is not drawn." },
+        "inner_R": { "type": "boolean", "description": "Another block lies close beside the right side, so it is not drawn." }
+      }
+    }
+  }
+}

@@ -2,12 +2,15 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { buildTrim, type BandConfig } from './trim.ts';
 import { parseCsv, validateCity } from './validate.ts';
 
 const schemaDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'schemas');
 const schemas = readdirSync(schemaDir)
   .filter((f) => f.endsWith('.json'))
   .map((f) => JSON.parse(readFileSync(resolve(schemaDir, f), 'utf8')) as object);
+
+const config = JSON.parse(readFileSync(resolve(schemaDir, '..', 'config', 'band-geometry.json'), 'utf8')) as BandConfig;
 
 const HEADER = 'segment_id,side,layer,type,limit_minutes,permit_code,color_key,schedule';
 const SCHEDULE = '"{""windows"":[{""days"":[""mon""],""start"":""08:00"",""end"":""10:00""}]}"';
@@ -228,6 +231,35 @@ describe('validateCity', () => {
     files['notes.txt'] = 'hello';
     const problems = validateCity(files, schemas);
     expect(problems.map((p) => p.file).sort()).toEqual(['city.json', 'notes.txt']);
+  });
+});
+
+describe('trim.json', () => {
+  const entry = { trim_start_m: 3.4, trim_end_m: 0, sliver: false, inner_L: false, inner_R: true };
+  const withTrim = (trim: unknown) => ({ ...goodCity(), 'trim.json': JSON.stringify(trim) });
+
+  it('is optional, and accepted when it matches the segments', () => {
+    expect(validateCity(withTrim({ city_id: 'testville', segments: { 'seg-1': entry } }), schemas)).toEqual([]);
+  });
+
+  it('accepts what buildTrim writes, for any city_id', () => {
+    const files = goodCity();
+    const trim = buildTrim(JSON.parse(files['segments.geojson']), config);
+    expect(validateCity({ ...files, 'trim.json': JSON.stringify(trim) }, schemas)).toEqual([]);
+  });
+
+  it('reports a bad entry in plain words', () => {
+    const problems = validateCity(withTrim({ city_id: 'testville', segments: { 'seg-1': { ...entry, sliver: 'yes', trim_end_m: -1, extra: 1 } } }), schemas);
+    expect(problems.every((p) => p.file === 'trim.json')).toBe(true);
+    expect(problems.map((p) => p.reason).join('\n')).toMatch(/sliver.*boolean/);
+    expect(problems.map((p) => p.reason).join('\n')).toMatch(/trim_end_m.*at least 0/);
+    expect(problems.map((p) => p.reason).join('\n')).toMatch(/unexpected field "extra"/);
+  });
+
+  it('reports a trim file that is out of step with the segments, both ways', () => {
+    const stale = validateCity(withTrim({ city_id: 'testville', segments: { 'old-seg': entry } }), schemas);
+    expect(stale.map((p) => p.reason).join('\n')).toMatch(/No entry for 1 segment \(first: "seg-1"\).*build:data/);
+    expect(stale.map((p) => p.reason).join('\n')).toMatch(/not in segments\.geojson \(first: "old-seg"\)/);
   });
 });
 

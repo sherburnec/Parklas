@@ -31,6 +31,13 @@ The `DATA_SET` setting picks which folders `validate`, `build:data` and the page
 
 Never edit `segments.geojson`. It is the street list and must not change. Every `L` and `R` in `rules.csv` is read against the direction of its segment in that file, so a segment drawn the other way round would put its rows on the opposite curb. When the file is deliberately re-extracted (`node scripts/extract-burbank-segments.ts --force`), the script lists every segment whose direction is reversed, next to the added, removed and changed ones. It only reports; check the rows for those segments yourself.
 
+## Short blocks and inner sides on the map
+
+`npm run build:data` also writes `data/<city_id>/trim.json`, so the map can keep the side bands tidy. You never edit it, and it is rebuilt from `segments.geojson` and `config/band-geometry.json` (band offsets and widths). Two things follow for your data:
+
+- **A block under 20 m is drawn only if it has a rule row.** Short connecting blocks between two roads are left off the map unless you give them a rule. Their rows still work as normal.
+- **Inner-facing sides are not drawn on the map, but they still appear in the click-through list.** Where two roads run side by side, such as the two halves of a divided road, the sides that face each other are skipped because the bands would cross. Write their rows as you would for any other side.
+
 ## 1. Find a segment_id
 
 A segment is one block of one street, from one cross street to the next. Every block has a `segment_id`.
