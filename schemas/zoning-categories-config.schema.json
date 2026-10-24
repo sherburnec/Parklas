@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parklas.local/schemas/zoning-categories-config.schema.json",
+  "title": "Zoning category config",
+  "description": "data/<city_id>/zoning-categories.json. Defines the display categories and maps each exact zone code to one.",
+  "type": "object",
+  "required": ["city_id", "categories", "zone_codes"],
+  "additionalProperties": false,
+  "properties": {
+    "city_id": { "type": "string", "pattern": "^[a-z0-9_-]+$" },
+    "categories": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z0-9_]+$" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["label", "hex"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "hex": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+        }
+      }
+    },
+    "zone_codes": {
+      "type": "object",
+      "description": "Exact zone code to category key. Each value must be a key in categories (checked by the validator, not by the schema).",
+      "additionalProperties": { "type": "string", "pattern": "^[a-z0-9_]+$" }
+    }
+  }
+}

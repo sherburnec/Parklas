@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parklas.local/schemas/rule-row.schema.json",
+  "title": "Rule CSV row",
+  "description": "One row of a rules CSV, after the validator parses the cells: empty cells become null, limit_minutes becomes an integer, schedule (JSON text in the CSV) becomes an object or null. A null schedule means always in force. Street and cross streets come from the segment, not the row.",
+  "type": "object",
+  "required": ["segment_id", "side", "layer"],
+  "additionalProperties": false,
+  "properties": {
+    "segment_id": { "type": "string", "minLength": 1 },
+    "city_id": { "type": "string", "pattern": "^[a-z0-9_-]+$", "description": "Added by the build script; optional in the CSV." },
+    "side": { "enum": ["N", "S", "E", "W"] },
+    "layer": { "enum": ["sweeping", "timed_parking", "restrictions", "curb_color"] },
+    "type": {
+      "enum": ["no_parking", "no_standing", "no_stopping", null],
+      "description": "Restrictions only. The no-stopping layer is these rows filtered by type."
+    },
+    "limit_minutes": { "type": ["integer", "null"], "minimum": 1 },
+    "permit_code": { "type": ["string", "null"], "description": "Timed parking permit code, or the permit exception on a restriction." },
+    "color_key": { "type": ["string", "null"], "pattern": "^[a-z0-9_]+$", "description": "Key into the city's curb color config." },
+    "schedule": { "$ref": "schedule.schema.json" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "layer": { "const": "restrictions" } } },
+      "then": { "required": ["type"], "properties": { "type": { "enum": ["no_parking", "no_standing", "no_stopping"] } } },
+      "else": { "properties": { "type": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "layer": { "const": "timed_parking" } } },
+      "then": { "required": ["limit_minutes"], "properties": { "limit_minutes": { "type": "integer" } } },
+      "else": { "properties": { "limit_minutes": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "layer": { "const": "curb_color" } } },
+      "then": { "required": ["color_key"], "properties": { "color_key": { "type": "string" } } },
+      "else": { "properties": { "color_key": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "layer": { "enum": ["timed_parking", "restrictions"] } } },
+      "else": { "properties": { "permit_code": { "type": "null" } } }
+    }
+  ]
+}

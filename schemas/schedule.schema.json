@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parklas.local/schemas/schedule.schema.json",
+  "title": "Schedule",
+  "description": "A list of weekly windows. null means the rule is always in force. An end earlier than the start crosses midnight. weeks_of_month is optional; absent means every week.",
+  "type": ["object", "null"],
+  "required": ["windows"],
+  "additionalProperties": false,
+  "properties": {
+    "windows": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/window" }
+    }
+  },
+  "definitions": {
+    "time": {
+      "type": "string",
+      "pattern": "^(([01][0-9]|2[0-3]):[0-5][0-9]|24:00)$"
+    },
+    "window": {
+      "type": "object",
+      "required": ["days", "start", "end"],
+      "additionalProperties": false,
+      "properties": {
+        "days": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] }
+        },
+        "start": { "$ref": "#/definitions/time" },
+        "end": { "$ref": "#/definitions/time" },
+        "weeks_of_month": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 1, "maximum": 5 }
+        }
+      }
+    }
+  }
+}

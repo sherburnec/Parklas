@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parklas.local/schemas/curb-colors-config.schema.json",
+  "title": "Curb color config",
+  "description": "data/<city_id>/curb-colors.json. A new color is added by adding a key here.",
+  "type": "object",
+  "required": ["city_id", "colors"],
+  "additionalProperties": false,
+  "properties": {
+    "city_id": { "type": "string", "pattern": "^[a-z0-9_-]+$" },
+    "colors": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z0-9_]+$" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["label", "hex", "time_limit_minutes", "default_schedule"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "hex": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "time_limit_minutes": { "type": ["integer", "null"], "minimum": 1 },
+          "default_schedule": { "$ref": "schedule.schema.json" }
+        }
+      }
+    }
+  }
+}

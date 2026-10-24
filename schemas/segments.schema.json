@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parklas.local/schemas/segments.schema.json",
+  "title": "Street segments (base)",
+  "description": "data/<city_id>/segments.geojson. One LineString per block, from OpenStreetMap, frozen.",
+  "type": "object",
+  "required": ["type", "features"],
+  "properties": {
+    "type": { "const": "FeatureCollection" },
+    "features": { "type": "array", "items": { "$ref": "#/definitions/feature" } }
+  },
+  "definitions": {
+    "feature": {
+      "type": "object",
+      "required": ["type", "properties", "geometry"],
+      "properties": {
+        "type": { "const": "Feature" },
+        "properties": {
+          "type": "object",
+          "required": ["segment_id", "street", "city_id"],
+          "additionalProperties": false,
+          "properties": {
+            "segment_id": { "type": "string", "minLength": 1 },
+            "street": { "type": "string", "minLength": 1 },
+            "from_street": { "type": ["string", "null"] },
+            "to_street": { "type": ["string", "null"] },
+            "city_id": { "type": "string", "pattern": "^[a-z0-9_-]+$" }
+          }
+        },
+        "geometry": {
+          "type": "object",
+          "required": ["type", "coordinates"],
+          "properties": {
+            "type": { "const": "LineString" },
+            "coordinates": {
+              "type": "array",
+              "minItems": 2,
+              "items": { "type": "array", "minItems": 2, "maxItems": 3, "items": { "type": "number" } }
+            }
+          }
+        }
+      }
+    }
+  }
+}
