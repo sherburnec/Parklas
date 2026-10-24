@@ -48,9 +48,9 @@ function goodCity(): Record<string, string> {
     }),
     'rules.csv': [
       HEADER,
-      `seg-1,N,sweeping,,,,,${SCHEDULE}`,
-      'seg-1,S,timed_parking,,2,,,',
-      'seg-1,E,curb_color,,,,red,',
+      `seg-1,L,sweeping,,,,,${SCHEDULE}`,
+      'seg-1,R,timed_parking,,2,,,',
+      'seg-1,L,curb_color,,,,red,',
     ].join('\n'),
   };
 }
@@ -81,12 +81,23 @@ describe('validateCity', () => {
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatchObject({ file: 'rules.csv', row: 5 });
     expect(problems[0].reason).toContain('side');
-    expect(problems[0].reason).toContain('N, S, E, W');
+    expect(problems[0].reason).toContain('L, R');
+  });
+
+  it('rejects the old compass sides N, S, E and W, and lower-case l and r', () => {
+    for (const side of ['N', 'S', 'E', 'W', 'l', 'r']) {
+      const files = goodCity();
+      files['rules.csv'] += `\nseg-1,${side},sweeping,,,,,`;
+      const problems = validateCity(files, schemas);
+      expect(problems, side).toHaveLength(1);
+      expect(problems[0], side).toMatchObject({ file: 'rules.csv', row: 5 });
+      expect(problems[0].reason, side).toContain('must be one of L, R');
+    }
   });
 
   it('reports a segment_id that is not in segments.geojson', () => {
     const files = goodCity();
-    files['rules.csv'] += '\nnope-1,N,sweeping,,,,,';
+    files['rules.csv'] += '\nnope-1,L,sweeping,,,,,';
     const problems = validateCity(files, schemas);
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatchObject({ file: 'rules.csv', row: 5 });
@@ -95,7 +106,7 @@ describe('validateCity', () => {
 
   it('reports a color_key that is not in the curb color config', () => {
     const files = goodCity();
-    files['rules.csv'] += '\nseg-1,W,curb_color,,,,purple,';
+    files['rules.csv'] += '\nseg-1,R,curb_color,,,,purple,';
     const problems = validateCity(files, schemas);
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatchObject({ file: 'rules.csv', row: 5 });
@@ -112,7 +123,7 @@ describe('validateCity', () => {
 
   it('reports a schedule cell that is not valid JSON', () => {
     const files = goodCity();
-    files['rules.csv'] += '\nseg-1,N,sweeping,,,,,{not json';
+    files['rules.csv'] += '\nseg-1,L,sweeping,,,,,{not json';
     const problems = validateCity(files, schemas);
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatchObject({ file: 'rules.csv', row: 5 });
@@ -121,7 +132,7 @@ describe('validateCity', () => {
 
   it('reports a schedule that breaks the schedule schema', () => {
     const files = goodCity();
-    files['rules.csv'] += '\nseg-1,N,sweeping,,,,,"{""windows"":[{""days"":[""funday""],""start"":""8am"",""end"":""10:00""}]}"';
+    files['rules.csv'] += '\nseg-1,L,sweeping,,,,,"{""windows"":[{""days"":[""funday""],""start"":""8am"",""end"":""10:00""}]}"';
     const problems = validateCity(files, schemas);
     expect(problems.length).toBeGreaterThan(0);
     expect(problems.every((p) => p.file === 'rules.csv' && p.row === 5)).toBe(true);
@@ -129,7 +140,7 @@ describe('validateCity', () => {
 
   it('reports a non-integer limit_minutes and a wrong cell count', () => {
     const files = goodCity();
-    files['rules.csv'] += '\nseg-1,N,timed_parking,,two,,,\nseg-1,N,sweeping';
+    files['rules.csv'] += '\nseg-1,L,timed_parking,,two,,,\nseg-1,L,sweeping';
     const problems = validateCity(files, schemas);
     expect(problems.map((p) => p.row).sort()).toEqual([5, 6]);
     expect(problems.find((p) => p.row === 5)?.reason).toContain('limit_minutes');
@@ -138,7 +149,7 @@ describe('validateCity', () => {
 
   it('reports missing or unknown CSV columns', () => {
     const files = goodCity();
-    files['rules.csv'] = 'segment_id,side,bogus\nseg-1,N,x';
+    files['rules.csv'] = 'segment_id,side,bogus\nseg-1,L,x';
     const reasons = validateCity(files, schemas).map((p) => p.reason).join('\n');
     expect(reasons).toContain('layer');
     expect(reasons).toContain('bogus');
@@ -248,13 +259,13 @@ describe('sample data set', () => {
     const seg = JSON.parse(files['segments.geojson']);
     seg.features.push({ ...seg.features[0], properties: { ...seg.features[0].properties, segment_id: 'seg-2' } });
     files['segments.geojson'] = JSON.stringify(seg);
-    files['rules.csv'] += '\nseg-1,N,sweeping,,,,,\nseg-2,N,sweeping,,,,,';
+    files['rules.csv'] += '\nseg-1,L,sweeping,,,,,\nseg-2,L,sweeping,,,,,';
     expect(validateCity(files, schemas)).toEqual([]);
   });
 
   it('still rejects a row whose segment is not in the segments file', () => {
     const files = sampleCity();
-    files['rules.csv'] += '\nghost,N,sweeping,,,,,';
+    files['rules.csv'] += '\nghost,L,sweeping,,,,,';
     const problems = validateCity(files, schemas);
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatchObject({ file: 'rules.csv', row: 2 });
@@ -290,7 +301,7 @@ describe('sample data set', () => {
       geometry: { type: 'Polygon', coordinates: square },
     });
     files['permit-zones.geojson'] = JSON.stringify({ type: 'FeatureCollection', features: [permit('DEMO-A'), permit('A')] });
-    files['rules.csv'] += '\nseg-1,N,timed_parking,,120,DEMO-A,,\nseg-1,S,timed_parking,,120,B,,';
+    files['rules.csv'] += '\nseg-1,L,timed_parking,,120,DEMO-A,,\nseg-1,R,timed_parking,,120,B,,';
     const problems = validateCity(files, schemas);
     expect(problems.map((p) => [p.file, p.row])).toEqual([
       ['permit-zones.geojson', 2],
@@ -301,7 +312,7 @@ describe('sample data set', () => {
 
   it('does not apply the fake-code prefixes to a real city', () => {
     const files = goodCity();
-    files['rules.csv'] += '\nseg-1,W,timed_parking,,60,A,,';
+    files['rules.csv'] += '\nseg-1,R,timed_parking,,60,A,,';
     expect(validateCity(files, schemas)).toEqual([]);
   });
 });

@@ -1,6 +1,6 @@
 segment_id,side,layer,type,limit_minutes,permit_code,color_key,schedule
-burbank-11739956982-11739956983,E,sweeping,,,,,"{""windows"":[{""days"":[""mon""],""start"":""08:00"",""end"":""10:00""}]}"
-burbank-118435906-123108474,N,timed_parking,,120,,,"{""windows"":[{""days"":[""mon"",""tue"",""wed"",""thu"",""fri"",""sat""],""start"":""08:00"",""end"":""18:00""}]}"
-burbank-118435906-123108474,S,restrictions,no_parking,,A,,"{""windows"":[{""days"":[""mon"",""tue"",""wed"",""thu"",""fri""],""start"":""18:00"",""end"":""06:00""}]}"
-burbank-11739956983-11739956984,W,restrictions,no_stopping,,,,
-burbank-11739956984-11739956985,E,curb_color,,,,red,
+burbank-11739956982-11739956983,R,sweeping,,,,,"{""windows"":[{""days"":[""mon""],""start"":""08:00"",""end"":""10:00""}]}"
+burbank-118435906-123108474,L,timed_parking,,120,,,"{""windows"":[{""days"":[""mon"",""tue"",""wed"",""thu"",""fri"",""sat""],""start"":""08:00"",""end"":""18:00""}]}"
+burbank-118435906-123108474,R,restrictions,no_parking,,A,,"{""windows"":[{""days"":[""mon"",""tue"",""wed"",""thu"",""fri""],""start"":""18:00"",""end"":""06:00""}]}"
+burbank-11739956983-11739956984,L,restrictions,no_stopping,,,,
+burbank-11739956984-11739956985,R,curb_color,,,,red,

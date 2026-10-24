@@ -4,7 +4,7 @@ import type { SegmentCollection } from './segments.ts';
 
 export type { SegmentCollection };
 export type Line = [number, number][];
-export type Side = 'N' | 'S' | 'E' | 'W';
+export type Side = 'L' | 'R';
 export type Offset = 'left' | 'right';
 
 export interface RuleRow {
@@ -37,34 +37,15 @@ export interface BuiltLayers {
   coverage: { city_id: string; segment_ids: string[] };
 }
 
-const M_PER_DEG_LAT = 111_320;
-
-/** Direction of travel as east/north metres, first vertex to last. */
-function direction(line: Line): [number, number] {
-  const [x0, y0] = line[0];
-  const [x1, y1] = line[line.length - 1];
-  const midLat = ((y0 + y1) / 2) * (Math.PI / 180);
-  return [(x1 - x0) * M_PER_DEG_LAT * Math.cos(midLat), (y1 - y0) * M_PER_DEG_LAT];
-}
-
 /**
- * Which side of the line (in its drawn direction) a compass side is on. MapLibre's positive
- * line-offset shifts to the right of travel. A block carries N/S sides if it runs more east-west
- * than north-south, otherwise E/W; ties go to N/S, the same rule the M1-3 spike used for Burbank's
- * rotated downtown grid. A side from the other pair is an error, not a guess.
+ * Which way a side is offset. "L" and "R" are left and right when facing along the segment's direction (first to
+ * last coordinate in segments.geojson), which is also how MapLibre's line-offset reads: negative is left, positive right.
+ * Anything else, compass letters included, is an error, not a guess.
  */
-export function sideToOffset(side: Side, line: Line): Offset {
-  const [dx, dy] = direction(line);
-  const eastWest = Math.abs(dx) >= Math.abs(dy);
-  if (eastWest && (side === 'E' || side === 'W')) {
-    throw new Error(`side ${side} does not fit an east-west block (use N or S)`);
-  }
-  if (!eastWest && (side === 'N' || side === 'S')) {
-    throw new Error(`side ${side} does not fit a north-south block (use E or W)`);
-  }
-  const [nx, ny] = side === 'N' ? [0, 1] : side === 'S' ? [0, -1] : side === 'E' ? [1, 0] : [-1, 0];
-  // Cross product of direction and side normal: negative means the side is clockwise of travel, i.e. right.
-  return dx * ny - dy * nx < 0 ? 'right' : 'left';
+export function sideToOffset(side: Side): Offset {
+  if (side === 'L') return 'left';
+  if (side === 'R') return 'right';
+  throw new Error(`side ${JSON.stringify(side)} must be L or R (left or right facing along the segment's direction)`);
 }
 
 const empty = (): SideCollection => ({ type: 'FeatureCollection', features: [] });
@@ -86,7 +67,7 @@ export function buildLayers(segments: SegmentCollection, rows: RuleRow[], cityId
     if (!seg) throw new Error(`${where}: segment_id is not in segments.geojson`);
     let offset: Offset;
     try {
-      offset = sideToOffset(r.side, seg.geometry.coordinates);
+      offset = sideToOffset(r.side);
     } catch (err) {
       throw new Error(`${where}: ${(err as Error).message}`, { cause: err });
     }

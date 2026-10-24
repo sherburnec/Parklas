@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseRuleRows, sideToOffset, type RuleRow, type SegmentCollection } from './build.ts';
+import { buildLayers, parseRuleRows, type RuleRow, type SegmentCollection } from './build.ts';
 import { cellOf, generateSampleRows, rowsToCsv } from './sample-data.ts';
 
 // A 60 x 60 street grid over Burbank's extent: alternating east-west and north-south blocks.
@@ -57,8 +57,9 @@ describe('generateSampleRows', () => {
     expect(cells.size).toBe(9);
   });
 
-  it('only uses sides that fit the direction of each block', () => {
-    for (const r of rows) expect(() => sideToOffset(r.side, byId.get(r.segment_id)!.geometry.coordinates)).not.toThrow();
+  it('only uses the sides L and R, and the build script accepts every row', () => {
+    expect(new Set(rows.map((r) => r.side))).toEqual(new Set(['L', 'R']));
+    expect(() => buildLayers(segments, rows, 't')).not.toThrow();
   });
 
   it('covers every layer in at least 4 parts of the city', () => {
@@ -152,9 +153,9 @@ describe('day-by-day sweeping (TD-4)', () => {
     expect(half.length).toBeLessThan(starts.length / 2);
   });
 
-  it('uses both sides of streets running either direction', () => {
+  it('uses both sides of streets', () => {
     const sides = new Set([...both.values()].flat().map((r) => r.side));
-    expect(sides).toEqual(new Set(['N', 'S', 'E', 'W']));
+    expect(sides).toEqual(new Set(['L', 'R']));
   });
 });
 
@@ -192,7 +193,7 @@ describe('data/burbank-sample', () => {
     expect(days).toEqual(new Set(['mon', 'tue', 'wed', 'thu', 'fri']));
     const both = bothSidesSweeping(rows);
     expect(both.size).toBeGreaterThan(0);
-    expect(new Set([...both.values()].flat().map((r) => r.side))).toEqual(new Set(['N', 'S', 'E', 'W']));
+    expect(new Set([...both.values()].flat().map((r) => r.side))).toEqual(new Set(['L', 'R']));
     expect(sweeping.some((r) => windowsOf(r).some((w) => w.start === '08:30'))).toBe(true);
   });
 

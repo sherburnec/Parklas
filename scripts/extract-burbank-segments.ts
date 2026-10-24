@@ -13,6 +13,7 @@ import {
   buildSegments,
   diffSegments,
   findBlocksCrossingIntersections,
+  findDirectionChanges,
   type OsmElement,
   type SegmentCollection,
 } from './lib/segments.ts';
@@ -128,6 +129,11 @@ async function main() {
     report('added', diff.added);
     report('removed', diff.removed);
     report('changed (same id, new name or geometry)', diff.changed);
+    const reversed = findDirectionChanges(previous, fc);
+    report('DIRECTION REVERSED (every L and R row on these now lands on the other curb)', reversed);
+    if (reversed.length) {
+      console.warn('Reported only: nothing was flipped. Review these ids and their rows in rules.csv before committing.');
+    }
   }
 }
 

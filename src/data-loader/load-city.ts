@@ -3,7 +3,7 @@
 import type { FeatureCollection, LineString, Polygon } from 'geojson';
 import { dataFolder, getDataSet, type DataSet } from './data-set';
 
-export type Side = 'N' | 'S' | 'E' | 'W';
+export type Side = 'L' | 'R';
 
 /** Schedule format from schemas/schedule.schema.json. null means always in force. */
 export interface ScheduleWindow {

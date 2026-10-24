@@ -190,3 +190,32 @@ export function diffSegments(before: SegmentCollection, after: SegmentCollection
     changed: [...next.keys()].filter((id) => old.has(id) && old.get(id) !== next.get(id)).sort(),
   };
 }
+
+const M_PER_DEG_LAT = 111_320;
+
+/** Direction of travel as east/north metres, first coordinate to last. */
+function travel(f: SegmentFeature): [number, number] {
+  const line = f.geometry.coordinates;
+  const [x0, y0] = line[0];
+  const [x1, y1] = line[line.length - 1];
+  const midLat = ((y0 + y1) / 2) * (Math.PI / 180);
+  return [(x1 - x0) * M_PER_DEG_LAT * Math.cos(midLat), (y1 - y0) * M_PER_DEG_LAT];
+}
+
+/**
+ * Segment ids present in both files whose direction (first to last coordinate) points the opposite way.
+ * Rule rows say L or R relative to that direction, so every row on a reversed segment would now land on
+ * the other curb. Only reports; nothing is flipped or rewritten. Closed loops have no direction and are skipped.
+ */
+export function findDirectionChanges(frozen: SegmentCollection, candidate: SegmentCollection): string[] {
+  const old = new Map(frozen.features.map((f) => [f.properties.segment_id, f]));
+  const reversed: string[] = [];
+  for (const f of candidate.features) {
+    const before = old.get(f.properties.segment_id);
+    if (!before) continue;
+    const [bx, by] = travel(before);
+    const [ax, ay] = travel(f);
+    if (bx * ax + by * ay < 0) reversed.push(f.properties.segment_id);
+  }
+  return reversed.sort();
+}

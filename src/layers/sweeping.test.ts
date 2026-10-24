@@ -5,7 +5,7 @@ import { bandOffsetPx, bandWidthPx, sweepingStyle } from './sweeping';
 
 const side = (schedule: Schedule, offset: 'left' | 'right' = 'left') => ({
   type: 'Feature' as const,
-  properties: { segment_id: 's', city_id: 'test', side: 'N' as const, offset, schedule },
+  properties: { segment_id: 's', city_id: 'test', side: 'L' as const, offset, schedule },
   geometry: { type: 'LineString' as const, coordinates: [[0, 0], [1, 0]] },
 });
 const collection = (...features: ReturnType<typeof side>[]): SideCollection => ({ type: 'FeatureCollection', features });

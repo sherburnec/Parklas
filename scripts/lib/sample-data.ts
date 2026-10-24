@@ -2,7 +2,7 @@
 //
 // Picks about 1 in 15 segments, spread over the whole city, and gives each some made-up rules.
 // Everything random comes from a seeded generator, so the same segments and seed give the same rows.
-import { sideToOffset, type RuleRow, type SegmentCollection, type Side } from './build.ts';
+import type { RuleRow, SegmentCollection, Side } from './build.ts';
 
 export const SAMPLE_SEED = 20261023;
 const ONE_IN = 15;
@@ -77,15 +77,7 @@ function pickSegments(segments: SegmentCollection, rng: Rng): Set<string> {
   return picked;
 }
 
-/** The two sides that fit the block's direction, the same test the build script applies. */
-function sidesOf(segment: Segment): [Side, Side] {
-  try {
-    sideToOffset('N', segment.geometry.coordinates);
-    return ['N', 'S'];
-  } catch {
-    return ['E', 'W'];
-  }
-}
+const SIDES: [Side, Side] = ['L', 'R'];
 
 const pick = <T>(items: readonly T[], rng: Rng): T => items[Math.floor(rng() * items.length)];
 const chance = (p: number, rng: Rng) => rng() < p;
@@ -192,14 +184,13 @@ export function generateSampleRows(segments: SegmentCollection, seed: number): R
   for (const segment of segments.features) {
     const id = segment.properties.segment_id;
     if (!picked.has(id)) continue;
-    const sides = sidesOf(segment);
     let layers = LAYER_ODDS.filter(([, p]) => chance(p, rng)).map(([layer]) => layer);
     if (layers.length === 0) layers = [pick(LAYER_ODDS, rng)[0]];
     const sweepDays = areaSweepDays(segment, segments);
     if (sweepDays && !layers.includes('sweeping')) layers = ['sweeping', ...layers];
     for (const layer of layers) {
-      if (layer === 'sweeping' && sweepDays) rows.push(...dayByDaySweepingRows(id, sides, sweepDays, rng));
-      else rows.push(rowFor(layer, id, pick(sides, rng), rng));
+      if (layer === 'sweeping' && sweepDays) rows.push(...dayByDaySweepingRows(id, SIDES, sweepDays, rng));
+      else rows.push(rowFor(layer, id, pick(SIDES, rng), rng));
     }
   }
   return rows;

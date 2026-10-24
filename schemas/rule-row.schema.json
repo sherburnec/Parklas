@@ -9,7 +9,7 @@
   "properties": {
     "segment_id": { "type": "string", "minLength": 1 },
     "city_id": { "type": "string", "pattern": "^[a-z0-9_-]+$", "description": "Added by the build script; optional in the CSV." },
-    "side": { "enum": ["N", "S", "E", "W"] },
+    "side": { "enum": ["L", "R"], "description": "Left or right when facing along the segment's direction: first to last coordinate of its line in segments.geojson. Never a compass direction." },
     "layer": { "enum": ["sweeping", "timed_parking", "restrictions", "curb_color"] },
     "type": {
       "enum": ["no_parking", "no_standing", "no_stopping", null],

@@ -29,7 +29,7 @@ The script reads `data/burbank/segments.geojson` (it never changes it) and picks
 
 The `DATA_SET` setting picks which folders `validate`, `build:data` and the page use: `sample` (the default) uses folders named `<city_id>-sample`, `real` uses the others. In PowerShell: `$env:DATA_SET='real'; npm run validate`. When the page uses the sample set it shows "Sample data. Not real Burbank rules."
 
-Never edit `segments.geojson`. It is the street list and must not change.
+Never edit `segments.geojson`. It is the street list and must not change. Every `L` and `R` in `rules.csv` is read against the direction of its segment in that file, so a segment drawn the other way round would put its rows on the opposite curb. When the file is deliberately re-extracted (`node scripts/extract-burbank-segments.ts --force`), the script lists every segment whose direction is reversed, next to the added, removed and changed ones. It only reports; check the rows for those segments yourself.
 
 ## 1. Find a segment_id
 

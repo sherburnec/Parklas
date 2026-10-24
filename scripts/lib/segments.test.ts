@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildSegments,
   diffSegments,
+  findDirectionChanges,
   findBlocksCrossingIntersections,
   isCurbRoad,
   type OsmElement,
@@ -210,5 +211,45 @@ describe('diffSegments', () => {
   it('reports nothing when identical', () => {
     const same = collection(line('a', 'Main', [[0, 0], [1, 1]]));
     expect(diffSegments(same, same)).toEqual({ added: [], removed: [], changed: [] });
+  });
+});
+
+describe('findDirectionChanges', () => {
+  const eastWest: [number, number][] = [[-118.31, 34.18], [-118.30, 34.18]];
+  const northSouth: [number, number][] = [[-118.31, 34.19], [-118.31, 34.18]];
+  const diagonal: [number, number][] = [[-118.31, 34.18], [-118.30, 34.19]];
+  const flip = (l: [number, number][]) => [...l].reverse();
+
+  it('reports a segment whose first-to-last direction is reversed, on east-west, north-south and diagonal streets', () => {
+    const frozen = collection(line('ew', 'A', eastWest), line('ns', 'B', northSouth), line('dg', 'C', diagonal));
+    const candidate = collection(line('ew', 'A', flip(eastWest)), line('ns', 'B', flip(northSouth)), line('dg', 'C', flip(diagonal)));
+    expect(findDirectionChanges(frozen, candidate)).toEqual(['dg', 'ew', 'ns']);
+  });
+
+  it('judges a bent block by its first and last coordinate', () => {
+    const bent: [number, number][] = [[-118.31, 34.18], [-118.3099, 34.1801], [-118.30, 34.1802]];
+    expect(findDirectionChanges(collection(line('b', 'A', bent)), collection(line('b', 'A', flip(bent))))).toEqual(['b']);
+  });
+
+  it('ignores segments that keep their direction, even if renamed or slightly moved', () => {
+    const moved: [number, number][] = [[-118.3101, 34.1801], [-118.2999, 34.1801]];
+    const frozen = collection(line('ew', 'A', eastWest), line('ns', 'B', northSouth));
+    const candidate = collection(line('ew', 'Renamed', moved), line('ns', 'B', northSouth));
+    expect(findDirectionChanges(frozen, candidate)).toEqual([]);
+  });
+
+  it('ignores added and removed ids, and closed loops that have no direction', () => {
+    const loop: [number, number][] = [[-118.31, 34.18], [-118.30, 34.18], [-118.30, 34.19], [-118.31, 34.18]];
+    const frozen = collection(line('gone', 'A', eastWest), line('loop', 'B', loop));
+    const candidate = collection(line('new', 'A', flip(eastWest)), line('loop', 'B', flip(loop)));
+    expect(findDirectionChanges(frozen, candidate)).toEqual([]);
+  });
+
+  it('only reports: neither input is changed', () => {
+    const frozen = collection(line('ew', 'A', eastWest));
+    const candidate = collection(line('ew', 'A', flip(eastWest)));
+    const before = JSON.stringify([frozen, candidate]);
+    findDirectionChanges(frozen, candidate);
+    expect(JSON.stringify([frozen, candidate])).toBe(before);
   });
 });
