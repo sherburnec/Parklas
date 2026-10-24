@@ -67,6 +67,10 @@ function styleFor(segments: FeatureCollection<LineString>): maplibregl.StyleSpec
 }
 
 export interface Basemap {
+  /** The map, so rule layers can draw on it. */
+  map: maplibregl.Map;
+  /** Rule layers that sit under the street lines are added before this layer id. */
+  underStreetsLayerId: string;
   /** Resolves once the style and street lines are loaded. */
   ready: Promise<void>;
   destroy(): void;
@@ -114,5 +118,5 @@ export function createBasemap(
   });
 
   const ready = new Promise<void>((resolve) => map.once('load', () => resolve()));
-  return { ready, destroy: () => map.remove() };
+  return { map, underStreetsLayerId: 'segments-line', ready, destroy: () => map.remove() };
 }

@@ -114,7 +114,7 @@ App state (day, hour, toggles) lives in memory and the URL, never browser storag
 | M3-1 ✅ | Data loader, single entry point. CI runs `npm run build:data` for every city folder under `data/` (generated `public/` is gitignored); the loader takes a city_id and reads `data/<city_id>/` paths, so a new city needs only a data folder | M2-4 | S | A search finds no data fetch outside the loader; the deployed site serves the built files for every city folder | AR-3 |
 | M3-2 ✅ | Not-yet-mapped style from coverage file | M1-2, M3-1 | S | Unmapped blocks show hatched; clicking says "not yet mapped" | FR-12 |
 | TD-3 ✅ | Citywide sample zoning: extend the generator so `SAMPLE-` zoning polygons tile the whole city (grid cells snapped to street lines, groups of whole blocks). Codes `SAMPLE-R1`, `C1`, `C2`, `MU`, `M1`, `OS`, `P`; `C1` and `C2` share a category to test the code map; adds a `public` category | TD-2, M3-2 | S | `validate` passes; every point in the city falls in exactly one zone; every category appears in at least 2 separate places | Testing |
-| M3-3 | Zoning polygons, category colors from code map | M3-1 | S | Each zone code shows its category color | FR-3 |
+| M3-3 ✅ | Zoning polygons, category colors from code map | M3-1 | S | Each zone code shows its category color | FR-3 |
 | M3-4 | Street sweeping layer | M2-1, M3-1, M1-3 | M | Active sides highlight and inactive mute at the chosen hour | FR-4 |
 | M3-5 | Timed parking layer, style per limit | M2-1, M3-1, M1-3 | M | 1, 2, 3 and 4 hour limits look different | FR-5 |
 | M3-6 | Restrictions layer, three styles plus permit code | M2-1, M3-1, M1-3 | M | Each type is distinct; permit code shows where set | FR-6 |

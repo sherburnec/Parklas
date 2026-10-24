@@ -1,5 +1,6 @@
 import { createBasemap } from './basemap';
 import { bannerText, getDataSet, loadCity } from './data-loader';
+import { drawZoning } from './layers';
 
 const CITY_ID = 'burbank';
 
@@ -17,7 +18,11 @@ const app = document.getElementById('app') as HTMLElement;
 
 loadCity(CITY_ID)
   .then((city) => {
-    createBasemap(app, city.segments, city.coverage.segment_ids);
+    const basemap = createBasemap(app, city.segments, city.coverage.segment_ids);
+    const { zoning, zoningCategories } = city;
+    if (zoning && zoningCategories) {
+      void basemap.ready.then(() => drawZoning(basemap.map, zoning, zoningCategories, basemap.underStreetsLayerId, app));
+    }
   })
   .catch((err: unknown) => {
     const message = document.createElement('p');
