@@ -15,7 +15,7 @@ Everything here is typed by hand. Each city has its own folder, `data/<city_id>/
 
 What it holds:
 
-- `rules.csv`: about 320 rows on about 1 in 15 segments (172 of 2582), spread over the whole city, across sweeping, timed parking, restrictions (all three types, some with a `DEMO-` permit code) and curb colors. Schedules include always-on, day and hour windows, a window that crosses midnight, and a few `weeks_of_month` windows. Every other block stays "not yet mapped".
+- `rules.csv`: about 450 rows on about 1 in 15 segments (172 of 2582), spread over the whole city, across sweeping, timed parking, restrictions (all three types, some with a `DEMO-` permit code) and curb colors. Schedules include always-on, day and hour windows, a window that crosses midnight, and a few `weeks_of_month` windows. Every other block stays "not yet mapped".
 - `curb-colors.json` and `zoning-categories.json`: a few entries each.
 - `zoning.geojson` (20 `SAMPLE-` polygons tiling the whole city, written by `npm run generate:sample`, do not edit by hand) and `permit-zones.geojson` (4 `DEMO-` polygons): coarse rectangles in different parts of the city. Edit the permit zones by hand.
 
