@@ -11,7 +11,21 @@ Everything here is typed by hand. Each city has its own folder, `data/<city_id>/
 
 ## Sample data set
 
-`data/burbank-sample/` is made-up data for building and testing the layers. Its zone codes start with `SAMPLE-` and its permit codes with `DEMO-`; the validator rejects anything else. `area.json` lists the ~30 connected Burbank segments it covers (rows outside that list are rejected). It borrows `data/burbank/segments.geojson` and never copies it.
+`data/burbank-sample/` is made-up data for building and testing the layers. Its zone codes start with `SAMPLE-` and its permit codes with `DEMO-`; the validator rejects anything else. It borrows `data/burbank/segments.geojson` and never copies it, and its rules may fall on any segment in that file.
+
+What it holds:
+
+- `rules.csv`: about 320 rows on about 1 in 15 segments (172 of 2582), spread over the whole city, across sweeping, timed parking, restrictions (all three types, some with a `DEMO-` permit code) and curb colors. Schedules include always-on, day and hour windows, a window that crosses midnight, and a few `weeks_of_month` windows. Every other block stays "not yet mapped".
+- `curb-colors.json` and `zoning-categories.json`: a few entries each.
+- `zoning.geojson` (5 `SAMPLE-` polygons) and `permit-zones.geojson` (4 `DEMO-` polygons): coarse rectangles in different parts of the city. Edit these by hand.
+
+`rules.csv` here is written by a seeded script, so the same command always gives the same file. Do not edit it by hand; regenerate it:
+
+```
+npm run generate:sample
+```
+
+The script reads `data/burbank/segments.geojson` (it never changes it) and picks segments by sampling each part of an 8 x 8 grid over the city. To get a different spread, change `SAMPLE_SEED` in `scripts/lib/sample-data.ts`, then update the seed in `scripts/lib/sample-data.test.ts`. `npm test` fails if `rules.csv` is out of step with the script.
 
 The `DATA_SET` setting picks which folders `validate`, `build:data` and the page use: `sample` (the default) uses folders named `<city_id>-sample`, `real` uses the others. In PowerShell: `$env:DATA_SET='real'; npm run validate`. When the page uses the sample set it shows "Sample data. Not real Burbank rules."
 

@@ -1,1 +1,6 @@
-{"type":"FeatureCollection","features":[]}
+{"type":"FeatureCollection","features":[
+{"type":"Feature","properties":{"permit_code":"DEMO-A","name":"Demo permit zone A (west)","city_id":"burbank-sample"},"geometry":{"type":"Polygon","coordinates":[[[-118.362,34.175],[-118.345,34.175],[-118.345,34.19],[-118.362,34.19],[-118.362,34.175]]]}},
+{"type":"Feature","properties":{"permit_code":"DEMO-B","name":"Demo permit zone B (north-central)","city_id":"burbank-sample"},"geometry":{"type":"Polygon","coordinates":[[[-118.325,34.19],[-118.308,34.19],[-118.308,34.2],[-118.325,34.2],[-118.325,34.19]]]}},
+{"type":"Feature","properties":{"permit_code":"DEMO-C","name":"Demo permit zone C (southeast)","city_id":"burbank-sample"},"geometry":{"type":"Polygon","coordinates":[[[-118.3,34.15],[-118.282,34.15],[-118.282,34.165],[-118.3,34.165],[-118.3,34.15]]]}},
+{"type":"Feature","properties":{"permit_code":"DEMO-D","name":"Demo permit zone D (south-central)","city_id":"burbank-sample"},"geometry":{"type":"Polygon","coordinates":[[[-118.345,34.162],[-118.33,34.162],[-118.33,34.174],[-118.345,34.174],[-118.345,34.162]]]}}
+]}

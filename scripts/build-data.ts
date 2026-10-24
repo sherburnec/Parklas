@@ -10,7 +10,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFi
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildLayers, parseRuleRows, type SegmentCollection } from './lib/build.ts';
-import { citiesToProcess, loadCityFiles, parseDataSet } from './lib/data-set.ts';
+import { citiesToProcess, loadCityFiles, parseDataSet, passThroughFiles } from './lib/data-set.ts';
 import { validateCity } from './lib/validate.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -56,10 +56,8 @@ if (problems > 0) {
 const write = (path: string, data: unknown) => writeFileSync(path, JSON.stringify(data) + '\n');
 
 for (const [city, files] of folders) {
-  const allSegments = JSON.parse(files['segments.geojson'] ?? '{"type":"FeatureCollection","features":[]}') as SegmentCollection;
-  // A sample set covers only its area.json; the validator has already checked every id exists.
-  const area = files['area.json'] ? new Set((JSON.parse(files['area.json']) as { segment_ids: string[] }).segment_ids) : null;
-  const segments = area ? { ...allSegments, features: allSegments.features.filter((f) => area.has(f.properties.segment_id)) } : allSegments;
+  // Every city draws its whole street base, sample sets included.
+  const segments = JSON.parse(files['segments.geojson'] ?? '{"type":"FeatureCollection","features":[]}') as SegmentCollection;
   const rows = parseRuleRows(files['rules.csv'] ?? '');
   let built;
   try {
@@ -76,10 +74,10 @@ for (const [city, files] of folders) {
   write(resolve(out, 'restrictions.geojson'), built.restrictions);
   write(resolve(out, 'curb-colors.geojson'), built.curbColors);
   write(resolve(out, 'coverage.json'), built.coverage);
-  // Polygons were validated above and pass through unchanged.
-  for (const polygons of ['zoning.geojson', 'permit-zones.geojson']) {
-    if (polygons in files) copyFileSync(resolve(dataDir, city, polygons), resolve(out, polygons));
-  }
+  // The page loads the street list too, so it needs no other source.
+  write(resolve(out, 'segments.geojson'), segments);
+  // Validated above; polygons and configs pass through unchanged.
+  for (const file of passThroughFiles(files)) copyFileSync(resolve(dataDir, city, file), resolve(out, file));
 
   console.log(
     `${city}: ${rows.length} rule rows -> sweeping ${built.sweeping.features.length}, timed parking ${built.timedParking.features.length}, ` +

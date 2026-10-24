@@ -1,4 +1,9 @@
 {
   "city_id": "burbank-sample",
-  "colors": {}
+  "colors": {
+    "red": { "label": "Red: no stopping", "hex": "#D32F2F", "time_limit_minutes": null, "default_schedule": null },
+    "yellow": { "label": "Yellow: loading zone", "hex": "#F9C80E", "time_limit_minutes": 30, "default_schedule": null },
+    "green": { "label": "Green: short-term parking", "hex": "#2E9E5B", "time_limit_minutes": 15, "default_schedule": { "windows": [{ "days": ["mon", "tue", "wed", "thu", "fri"], "start": "08:00", "end": "18:00" }] } },
+    "white": { "label": "White: passenger loading", "hex": "#F5F5F5", "time_limit_minutes": 5, "default_schedule": null }
+  }
 }

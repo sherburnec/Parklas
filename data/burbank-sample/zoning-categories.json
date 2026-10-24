@@ -1,5 +1,17 @@
 {
   "city_id": "burbank-sample",
-  "categories": {},
-  "zone_codes": {}
+  "categories": {
+    "residential": { "label": "Residential", "hex": "#F4D35E" },
+    "commercial": { "label": "Commercial", "hex": "#EE6C4D" },
+    "industrial": { "label": "Industrial", "hex": "#8D99AE" },
+    "mixed_use": { "label": "Mixed use", "hex": "#B56576" },
+    "open_space": { "label": "Open space", "hex": "#6A994E" }
+  },
+  "zone_codes": {
+    "SAMPLE-R1": "residential",
+    "SAMPLE-C1": "commercial",
+    "SAMPLE-I1": "industrial",
+    "SAMPLE-MU": "mixed_use",
+    "SAMPLE-OS": "open_space"
+  }
 }

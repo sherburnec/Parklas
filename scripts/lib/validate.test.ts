@@ -225,7 +225,6 @@ describe('sample data set', () => {
     return {
       'city.json': JSON.stringify({ city_id: 'testville-sample', name: 'Testville (sample)', time_zone: 'America/Los_Angeles' }),
       'segments.geojson': goodCity()['segments.geojson'],
-      'area.json': JSON.stringify({ city_id: 'testville-sample', segments_from: 'testville', segment_ids: ['seg-1'] }),
       'rules.csv': HEADER,
       'zoning.geojson': JSON.stringify({ type: 'FeatureCollection', features: [] }),
       'permit-zones.geojson': JSON.stringify({ type: 'FeatureCollection', features: [] }),
@@ -244,33 +243,27 @@ describe('sample data set', () => {
     expect(validateCity(sampleCity(), schemas)).toEqual([]);
   });
 
-  it('reports an area segment_id that is not in the segments file', () => {
-    const files = sampleCity();
-    files['area.json'] = JSON.stringify({ city_id: 'testville-sample', segments_from: 'testville', segment_ids: ['seg-1', 'ghost'] });
-    const problems = validateCity(files, schemas);
-    expect(problems).toHaveLength(1);
-    expect(problems[0]).toMatchObject({ file: 'area.json', row: 2 });
-    expect(problems[0].reason).toContain('ghost');
-  });
-
-  it('reports an empty or duplicated area list', () => {
-    const files = sampleCity();
-    files['area.json'] = JSON.stringify({ city_id: 'testville-sample', segments_from: 'testville', segment_ids: [] });
-    expect(validateCity(files, schemas)).toHaveLength(1);
-    files['area.json'] = JSON.stringify({ city_id: 'testville-sample', segments_from: 'testville', segment_ids: ['seg-1', 'seg-1'] });
-    expect(validateCity(files, schemas)).toHaveLength(1);
-  });
-
-  it('reports a rule row outside the sample area', () => {
+  it('accepts rows on any segment, with no area list', () => {
     const files = sampleCity();
     const seg = JSON.parse(files['segments.geojson']);
     seg.features.push({ ...seg.features[0], properties: { ...seg.features[0].properties, segment_id: 'seg-2' } });
     files['segments.geojson'] = JSON.stringify(seg);
-    files['rules.csv'] += '\nseg-2,N,sweeping,,,,,';
+    files['rules.csv'] += '\nseg-1,N,sweeping,,,,,\nseg-2,N,sweeping,,,,,';
+    expect(validateCity(files, schemas)).toEqual([]);
+  });
+
+  it('still rejects a row whose segment is not in the segments file', () => {
+    const files = sampleCity();
+    files['rules.csv'] += '\nghost,N,sweeping,,,,,';
     const problems = validateCity(files, schemas);
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatchObject({ file: 'rules.csv', row: 2 });
-    expect(problems[0].reason).toContain('area.json');
+  });
+
+  it('flags a leftover area.json as an unrecognised file', () => {
+    const files = sampleCity();
+    files['area.json'] = '{}';
+    expect(validateCity(files, schemas).map((p) => p.file)).toEqual(['area.json']);
   });
 
   it('requires zone codes to start with SAMPLE-', () => {

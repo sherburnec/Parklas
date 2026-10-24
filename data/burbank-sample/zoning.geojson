@@ -1,1 +1,7 @@
-{"type":"FeatureCollection","features":[]}
+{"type":"FeatureCollection","features":[
+{"type":"Feature","properties":{"zone_code":"SAMPLE-R1","category":"residential","name":"Sample residential (northwest)","city_id":"burbank-sample"},"geometry":{"type":"Polygon","coordinates":[[[-118.36,34.185],[-118.335,34.185],[-118.335,34.205],[-118.36,34.205],[-118.36,34.185]]]}},
+{"type":"Feature","properties":{"zone_code":"SAMPLE-C1","category":"commercial","name":"Sample commercial (central)","city_id":"burbank-sample"},"geometry":{"type":"Polygon","coordinates":[[[-118.318,34.175],[-118.298,34.175],[-118.298,34.188],[-118.318,34.188],[-118.318,34.175]]]}},
+{"type":"Feature","properties":{"zone_code":"SAMPLE-I1","category":"industrial","name":"Sample industrial (south)","city_id":"burbank-sample"},"geometry":{"type":"Polygon","coordinates":[[[-118.35,34.15],[-118.325,34.15],[-118.325,34.165],[-118.35,34.165],[-118.35,34.15]]]}},
+{"type":"Feature","properties":{"zone_code":"SAMPLE-MU","category":"mixed_use","name":"Sample mixed use (east)","city_id":"burbank-sample"},"geometry":{"type":"Polygon","coordinates":[[[-118.29,34.165],[-118.275,34.165],[-118.275,34.185],[-118.29,34.185],[-118.29,34.165]]]}},
+{"type":"Feature","properties":{"zone_code":"SAMPLE-OS","category":"open_space","name":"Sample open space (north)","city_id":"burbank-sample"},"geometry":{"type":"Polygon","coordinates":[[[-118.33,34.205],[-118.3,34.205],[-118.3,34.218],[-118.33,34.218],[-118.33,34.205]]]}}
+]}

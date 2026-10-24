@@ -48,3 +48,10 @@ export function loadCityFiles(dataDir: string, city: string): Record<string, str
   }
   return files;
 }
+
+/** Authored files the page loads as they are (task M3-1); only the ones the folder has. */
+export const PASS_THROUGH_FILES = ['city.json', 'zoning.geojson', 'permit-zones.geojson', 'curb-colors.json', 'zoning-categories.json'];
+
+export function passThroughFiles(files: Record<string, string>): string[] {
+  return PASS_THROUGH_FILES.filter((f) => f in files);
+}

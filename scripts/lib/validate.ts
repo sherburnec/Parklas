@@ -13,7 +13,6 @@ const SCHEMA_BY_FILE: Record<string, string> = {
   'segments.geojson': 'segments',
   'zoning.geojson': 'zoning',
   'permit-zones.geojson': 'permit-zones',
-  'area.json': 'area',
   'curb-colors.json': 'curb-colors-config',
   'zoning-categories.json': 'zoning-categories-config',
 };
@@ -176,15 +175,8 @@ export function validateCity(files: Record<string, string>, schemas: object[]): 
   const segmentIds = new Set<string>(
     (parsed['segments.geojson']?.features ?? []).map((f: any) => f?.properties?.segment_id).filter(Boolean), // eslint-disable-line @typescript-eslint/no-explicit-any
   );
-  // A sample set (city_id ending -sample) keeps to its area.json and uses obviously fake codes.
+  // A sample set (city_id ending -sample) may put rules on any segment but uses obviously fake codes.
   const sample = String(parsed['city.json']?.city_id ?? '').endsWith('-sample');
-  const area = parsed['area.json']?.segment_ids as string[] | undefined;
-  const areaIds = new Set<string>(Array.isArray(area) ? area : []);
-  if (Array.isArray(area)) {
-    area.forEach((id, i) => {
-      if (!segmentIds.has(id)) add('area.json', i + 1, `segment_id "${id}" is not in segments.geojson`);
-    });
-  }
   const colorKeys = new Set<string>(Object.keys(parsed['curb-colors.json']?.colors ?? {}));
   const hasColors = 'curb-colors.json' in parsed;
 
@@ -269,8 +261,6 @@ export function validateCity(files: Record<string, string>, schemas: object[]): 
       if (!validateRow(rec)) for (const reason of explain(validateRow.errors ?? [])) add(file, n, reason);
       if (typeof rec.segment_id === 'string' && !segmentIds.has(rec.segment_id)) {
         add(file, n, `segment_id "${rec.segment_id}" is not in segments.geojson`);
-      } else if (typeof rec.segment_id === 'string' && Array.isArray(area) && !areaIds.has(rec.segment_id)) {
-        add(file, n, `segment_id "${rec.segment_id}" is not in area.json (a sample set only covers its area)`);
       }
       if (sample && typeof rec.permit_code === 'string' && !rec.permit_code.startsWith('DEMO-')) {
         add(file, n, `permit_code "${rec.permit_code}" must start with DEMO- in a sample data set`);

@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { loadCityFiles, parseDataSet, selectCities, sourceCityOf } from './data-set.ts';
+import { loadCityFiles, parseDataSet, passThroughFiles, selectCities, sourceCityOf } from './data-set.ts';
 
 describe('parseDataSet', () => {
   it('defaults to sample when unset or empty', () => {
@@ -63,5 +63,12 @@ describe('loadCityFiles', () => {
   it('throws when the source city has no segments file', () => {
     rmSync(join(dir, 'burbank', 'segments.geojson'));
     expect(() => loadCityFiles(dir, 'burbank-sample')).toThrow(/data\/burbank\/segments\.geojson/);
+  });
+});
+
+describe('passThroughFiles', () => {
+  it('lists the authored files the folder has, and never rules.csv or segments', () => {
+    const files = { 'city.json': '{}', 'rules.csv': '', 'segments.geojson': '{}', 'curb-colors.json': '{}' };
+    expect(passThroughFiles(files)).toEqual(['city.json', 'curb-colors.json']);
   });
 });

@@ -10,7 +10,8 @@
     "test": "vitest run --passWithNoTests",
     "lint": "eslint .",
     "validate": "node scripts/validate.ts",
-    "build:data": "node scripts/build-data.ts"
+    "build:data": "node scripts/build-data.ts",
+    "generate:sample": "node scripts/generate-sample-data.ts"
   },
   "dependencies": {
     "maplibre-gl": "^6.15.0"
