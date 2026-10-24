@@ -278,6 +278,85 @@ function spreadTimedParking(rows: RuleRow[], segments: SegmentCollection, ctx: S
   return out;
 }
 
+// Restrictions spread (task TD-6). The earlier steps already make no parking (timed or with a permit code), no standing
+// and no stopping rows; this adds what was missing: no parking at any time, permit-only rows that use the code of the
+// DEMO- zone they sit in, no stopping on corner blocks, and restrictions on sides that already have timed parking.
+const CORNER_MAX_M = 90; // a "corner" block is short and ends at a different street
+const ADD_PERMIT_ONLY = [0.25, 0.03]; // [mapped, unmapped] chance for segments inside a permit zone
+const ADD_NO_STOPPING = [0.15, 0.012]; // corner blocks
+const ADD_ANY_TIME = [0.05, 0.006];
+const ADD_NO_STANDING = [0.04, 0.004];
+const ADD_ON_TIMED_SIDE = 0.2;
+
+const metres = (a: number[], b: number[]) => Math.hypot((b[0] - a[0]) * 92000, (b[1] - a[1]) * 111000); // Burbank's latitude
+
+const streetsAtCache = new WeakMap<SegmentCollection, Map<string, Set<string>>>();
+
+/** A short block with a different street meeting at one of its ends. */
+export function isCorner(segment: Segment, segments: SegmentCollection): boolean {
+  let streetsAt = streetsAtCache.get(segments);
+  if (!streetsAt) {
+    streetsAt = new Map();
+    for (const f of segments.features) {
+      const c = f.geometry.coordinates;
+      for (const p of [c[0], c[c.length - 1]]) {
+        const key = p.join();
+        streetsAt.set(key, (streetsAt.get(key) ?? new Set()).add(f.properties.street));
+      }
+    }
+    streetsAtCache.set(segments, streetsAt);
+  }
+  const c = segment.geometry.coordinates;
+  let length = 0;
+  for (let i = 1; i < c.length; i++) length += metres(c[i - 1], c[i]);
+  if (length >= CORNER_MAX_M) return false;
+  return [c[0], c[c.length - 1]].some((p) => [...streetsAt.get(p.join())!].some((s) => s !== segment.properties.street));
+}
+
+/**
+ * Adds restrictions on top of the existing rows (they all stay, in place); new rows go on the end.
+ * Uses its own generator, so no other row moves.
+ */
+function spreadRestrictions(rows: RuleRow[], segments: SegmentCollection, ctx: SampleContext, seed: number): RuleRow[] {
+  const rng = mulberry32((seed ^ 0x52455354) >>> 0);
+  const taken = new Set<string>(); // sides that already have a restriction
+  const mapped = new Set<string>();
+  const timed = new Set<string>();
+  for (const r of rows) {
+    mapped.add(r.segment_id);
+    if (r.layer === 'restrictions') taken.add(`${r.segment_id}|${r.side}`);
+    if (r.layer === 'timed_parking') timed.add(`${r.segment_id}|${r.side}`);
+  }
+  const added: RuleRow[] = [];
+  const add = (segment_id: string, side: Side, type: string, permit_code: string | null, schedule: Schedule) => {
+    taken.add(`${segment_id}|${side}`);
+    added.push({ segment_id, side, layer: 'restrictions', type: type as RuleRow['type'], limit_minutes: null, permit_code, color_key: null, schedule });
+  };
+  const freeSide = (id: string, preferred?: Side): Side | null => {
+    const free = SIDES.filter((s) => !taken.has(`${id}|${s}`));
+    if (free.length === 0) return null;
+    return preferred && free.includes(preferred) ? preferred : pick(free, rng);
+  };
+  for (const segment of segments.features) {
+    const id = segment.properties.segment_id;
+    const k = mapped.has(id) ? 0 : 1;
+    const permit = permitCodeAt(segment, ctx.permitZones);
+    const corner = isCorner(segment, segments);
+    let side: Side | null;
+    if (permit && chance(ADD_PERMIT_ONLY[k], rng) && (side = freeSide(id))) add(id, side, 'no_parking', permit, restrictionSchedule('no_parking', rng));
+    if (corner && chance(ADD_NO_STOPPING[k], rng) && (side = freeSide(id))) add(id, side, 'no_stopping', null, restrictionSchedule('no_stopping', rng));
+    if (chance(ADD_ANY_TIME[k], rng) && (side = freeSide(id))) add(id, side, 'no_parking', null, null);
+    if (chance(ADD_NO_STANDING[k], rng) && (side = freeSide(id))) add(id, side, 'no_standing', null, restrictionSchedule('no_standing', rng));
+    // A restriction on a side that already has timed parking, such as a rush-hour ban on a time-limited curb.
+    const timedSide = SIDES.find((s) => timed.has(`${id}|${s}`) && !taken.has(`${id}|${s}`));
+    if (timedSide && chance(ADD_ON_TIMED_SIDE, rng)) {
+      const type = pick(['no_parking', 'no_standing'], rng);
+      add(id, timedSide, type, null, type === 'no_parking' ? win(WEEKDAYS, '07:00', '09:00') : restrictionSchedule(type, rng));
+    }
+  }
+  return [...rows, ...added];
+}
+
 export function generateSampleRows(segments: SegmentCollection, seed: number, context?: SampleContext): RuleRow[] {
   const rng = mulberry32(seed);
   const picked = pickSegments(segments, rng);
@@ -294,7 +373,8 @@ export function generateSampleRows(segments: SegmentCollection, seed: number, co
       else rows.push(rowFor(layer, id, pick(SIDES, rng), rng));
     }
   }
-  return context ? spreadTimedParking(rows, segments, context, seed) : rows;
+  if (!context) return rows;
+  return spreadRestrictions(spreadTimedParking(rows, segments, context, seed), segments, context, seed);
 }
 
 const HEADER = 'segment_id,side,layer,type,limit_minutes,permit_code,color_key,schedule';

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildLayers, parseRuleRows, type RuleRow, type SegmentCollection } from './build.ts';
-import { cellOf, generateSampleRows, permitCodeAt, rowsToCsv, SAMPLE_SEED, zoneAt, type PermitZoneCollection } from './sample-data.ts';
+import { cellOf, generateSampleRows, isCorner, permitCodeAt, rowsToCsv, SAMPLE_SEED, zoneAt, type PermitZoneCollection } from './sample-data.ts';
 import { generateZoning } from './sample-zoning.ts';
 
 // A 60 x 60 street grid over Burbank's extent: alternating east-west and north-south blocks.
@@ -174,7 +174,7 @@ describe('timed parking spread (TD-5)', () => {
 
   it('is repeatable and leaves every other layer exactly as before', () => {
     expect(generateSampleRows(real, SAMPLE_SEED, context)).toEqual(rows);
-    const others = (rs: RuleRow[]) => rs.filter((r) => r.layer !== 'timed_parking');
+    const others = (rs: RuleRow[]) => rs.filter((r) => r.layer !== 'timed_parking' && r.layer !== 'restrictions'); // restrictions: see TD-6
     expect(others(rows)).toEqual(others(generateSampleRows(real, SAMPLE_SEED)));
   });
 
@@ -233,6 +233,69 @@ describe('rowsToCsv', () => {
 
   it('starts with the template header', () => {
     expect(rowsToCsv([]).split('\n')[0]).toBe('segment_id,side,layer,type,limit_minutes,permit_code,color_key,schedule');
+  });
+});
+
+// Restrictions spread (task TD-6): the five kinds of restriction, across the city.
+describe('restrictions spread (TD-6)', () => {
+  const data = resolve(import.meta.dirname, '..', '..', 'data');
+  const real = JSON.parse(readFileSync(resolve(data, 'burbank', 'segments.geojson'), 'utf8')) as SegmentCollection;
+  const permitZones = JSON.parse(readFileSync(resolve(data, 'burbank-sample', 'permit-zones.geojson'), 'utf8')) as PermitZoneCollection;
+  const context = { zoning: generateZoning(real, 'burbank-sample'), permitZones };
+  const rows = generateSampleRows(real, SAMPLE_SEED, context);
+  const base = generateSampleRows(real, SAMPLE_SEED);
+  const restrictions = rows.filter((r) => r.layer === 'restrictions');
+  const byId = new Map(real.features.map((f) => [f.properties.segment_id, f]));
+
+  const same = (a: RuleRow, b: RuleRow) => JSON.stringify(a) === JSON.stringify(b);
+  const inBase = (r: RuleRow) => base.some((b) => same(b, r));
+  const kindOf = (r: RuleRow) =>
+    r.type === 'no_stopping' ? 'no_stopping'
+      : r.type === 'no_standing' ? 'no_standing'
+        : r.permit_code !== null ? 'permit_only'
+          : r.schedule !== null ? 'no_parking_timed'
+            : 'no_parking_anytime';
+  const cellsOf = (kind: string) =>
+    new Set(restrictions.filter((r) => kindOf(r) === kind).map((r) => cellOf(byId.get(r.segment_id)!, real, 3)));
+
+  it('is repeatable, keeps the earlier restriction rows and leaves other layers alone', () => {
+    expect(generateSampleRows(real, SAMPLE_SEED, context)).toEqual(rows);
+    const old = base.filter((r) => r.layer === 'restrictions');
+    expect(restrictions.length).toBeGreaterThan(old.length);
+    expect(old.every((r) => restrictions.some((x) => same(x, r)))).toBe(true);
+  });
+
+  it('has each of the five kinds in at least 2 separate parts of the city', () => {
+    for (const kind of ['permit_only', 'no_parking_timed', 'no_parking_anytime', 'no_stopping', 'no_standing']) {
+      expect(cellsOf(kind).size, kind).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('puts permit-only rows inside DEMO- permit zones with that zone code, in at least 2 zones', () => {
+    const matching = restrictions.filter((r) => r.permit_code !== null && permitCodeAt(byId.get(r.segment_id)!, permitZones) === r.permit_code);
+    expect(matching.length).toBeGreaterThanOrEqual(10);
+    expect(new Set(matching.map((r) => r.permit_code)).size).toBeGreaterThanOrEqual(2);
+    const added = restrictions.filter((r) => !inBase(r));
+    for (const r of added.filter((x) => x.permit_code !== null)) {
+      expect(permitCodeAt(byId.get(r.segment_id)!, permitZones), r.segment_id).toBe(r.permit_code);
+    }
+  });
+
+  it('puts the added no stopping rows on short blocks that end at a cross street', () => {
+    const added = restrictions.filter((r) => r.type === 'no_stopping' && !inBase(r));
+    expect(added.length).toBeGreaterThanOrEqual(5);
+    for (const r of added) expect(isCorner(byId.get(r.segment_id)!, real), r.segment_id).toBe(true);
+  });
+
+  it('adds restrictions to sides that already have timed parking', () => {
+    const timed = new Set(rows.filter((r) => r.layer === 'timed_parking').map((r) => `${r.segment_id}|${r.side}`));
+    const onTimed = (rs: RuleRow[]) => rs.filter((r) => r.layer === 'restrictions' && timed.has(`${r.segment_id}|${r.side}`)).length;
+    expect(onTimed(rows)).toBeGreaterThan(onTimed(base) + 5);
+  });
+
+  it('writes no duplicate (segment, side) restriction rows and keeps unmapped blocks far more common', () => {
+    expect(new Set(restrictions.map((r) => `${r.segment_id}|${r.side}`)).size).toBe(restrictions.length);
+    expect(new Set(rows.map((r) => r.segment_id)).size).toBeLessThan(real.features.length / 10);
   });
 });
 
