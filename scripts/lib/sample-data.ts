@@ -28,7 +28,7 @@ function mulberry32(seed: number): Rng {
 
 const bboxCache = new WeakMap<SegmentCollection, [number, number, number, number]>();
 
-function bboxOf(segments: SegmentCollection): [number, number, number, number] {
+export function bboxOf(segments: SegmentCollection): [number, number, number, number] {
   const cached = bboxCache.get(segments);
   if (cached) return cached;
   let box: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
