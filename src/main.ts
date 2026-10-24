@@ -17,7 +17,7 @@ const app = document.getElementById('app') as HTMLElement;
 
 loadCity(CITY_ID)
   .then((city) => {
-    createBasemap(app, city.segments);
+    createBasemap(app, city.segments, city.coverage.segment_ids);
   })
   .catch((err: unknown) => {
     const message = document.createElement('p');

@@ -3,9 +3,14 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import type { FeatureCollection, LineString } from 'geojson';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 
+import { tagCoverage, UNMAPPED_MESSAGE } from './coverage';
+
 maplibregl.setWorkerUrl(workerUrl);
 
 const SOURCE_ID = 'segments';
+const UNMAPPED_LAYER_ID = 'segments-unmapped';
+// Wider than the drawn line so thin streets are easy to hit with a finger.
+const HIT_RADIUS_PX = 8;
 
 // Plain background, no tiles. Glyphs are only needed so street names can be drawn as text.
 function styleFor(segments: FeatureCollection<LineString>): maplibregl.StyleSpecification {
@@ -19,10 +24,25 @@ function styleFor(segments: FeatureCollection<LineString>): maplibregl.StyleSpec
         id: 'segments-line',
         type: 'line',
         source: SOURCE_ID,
+        filter: ['==', ['get', 'mapped'], true],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': '#9a9a9a',
           'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.6, 17, 3],
+        },
+      },
+      // Unmapped blocks are dashed and lighter so they never read as plain, unrestricted streets.
+      {
+        id: UNMAPPED_LAYER_ID,
+        type: 'line',
+        source: SOURCE_ID,
+        filter: ['!=', ['get', 'mapped'], true],
+        layout: { 'line-cap': 'butt', 'line-join': 'round' },
+        paint: {
+          'line-color': '#c0392b',
+          'line-opacity': 0.7,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 17, 3],
+          'line-dasharray': [1.5, 1.5],
         },
       },
       {
@@ -60,16 +80,38 @@ function bounds(segments: FeatureCollection<LineString>): maplibregl.LngLatBound
   return b;
 }
 
-/** Draws the street lines it is given; it does not know where they came from. */
-export function createBasemap(container: HTMLElement, segments: FeatureCollection<LineString>): Basemap {
+/**
+ * Draws the street lines it is given; it does not know where they came from.
+ * `mappedSegmentIds` lists the segments that have rules; all others are drawn as not yet mapped.
+ */
+export function createBasemap(
+  container: HTMLElement,
+  segments: FeatureCollection<LineString, { segment_id: string } & Record<string, unknown>>,
+  mappedSegmentIds: Iterable<string>,
+): Basemap {
   const map = new maplibregl.Map({
     container,
-    style: styleFor(segments),
+    style: styleFor(tagCoverage(segments, mappedSegmentIds)),
     bounds: bounds(segments),
     fitBoundsOptions: { padding: 20 },
     attributionControl: { customAttribution: '© OpenStreetMap contributors' },
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+  const unmappedAt = (point: maplibregl.Point) => {
+    const box: [maplibregl.PointLike, maplibregl.PointLike] = [
+      [point.x - HIT_RADIUS_PX, point.y - HIT_RADIUS_PX],
+      [point.x + HIT_RADIUS_PX, point.y + HIT_RADIUS_PX],
+    ];
+    return map.queryRenderedFeatures(box, { layers: [UNMAPPED_LAYER_ID] }).length > 0;
+  };
+  map.on('click', (e) => {
+    if (!unmappedAt(e.point)) return;
+    new maplibregl.Popup({ closeButton: true }).setLngLat(e.lngLat).setText(UNMAPPED_MESSAGE).addTo(map);
+  });
+  map.on('mousemove', (e) => {
+    map.getCanvas().style.cursor = unmappedAt(e.point) ? 'pointer' : '';
+  });
 
   const ready = new Promise<void>((resolve) => map.once('load', () => resolve()));
   return { ready, destroy: () => map.remove() };
