@@ -5,32 +5,51 @@ import type { SegmentCollection } from './build.ts';
 import { generateZoning, ZONING_CATEGORIES, ZONING_CODES, zoningConfig, zoningToJson, type ZoningCollection } from './sample-zoning.ts';
 
 type Zone = ZoningCollection['features'][number];
-type Rect = { w: number; e: number; s: number; n: number };
+type Pt = number[];
 
-const rect = (f: Zone): Rect => {
-  const ring = f.geometry.coordinates[0];
-  const xs = ring.map((p) => p[0]);
-  const ys = ring.map((p) => p[1]);
-  return { w: Math.min(...xs), e: Math.max(...xs), s: Math.min(...ys), n: Math.max(...ys) };
-};
+const ring = (f: Zone) => f.geometry.coordinates[0];
+const key = (p: Pt) => `${p[0]},${p[1]}`;
+const edgeKey = (a: Pt, b: Pt) => [key(a), key(b)].sort().join('|');
+const edgesOf = (r: Pt[]) => r.slice(1).map((p, i) => edgeKey(r[i], p));
 
-// Half-open on the east and north edges, so a point on a shared edge belongs to one zone only.
-const zonesAt = (zoning: ZoningCollection, x: number, y: number) =>
-  zoning.features.filter((f) => {
-    const r = rect(f);
-    return x >= r.w && x < r.e && y >= r.s && y < r.n;
-  });
+function areaOf(r: Pt[]): number {
+  let sum = 0;
+  for (let i = 0; i < r.length - 1; i++) sum += r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1];
+  return Math.abs(sum) / 2;
+}
 
-const touches = (a: Rect, b: Rect) =>
-  a.e === b.w || b.e === a.w
-    ? Math.min(a.n, b.n) > Math.max(a.s, b.s)
-    : a.n === b.s || b.n === a.s
-      ? Math.min(a.e, b.e) > Math.max(a.w, b.w)
-      : false;
+const cross = (o: Pt, a: Pt, b: Pt) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
 
-/** How many separate regions (cells that share an edge count as one) a category forms. */
+const onSegment = (p: Pt, a: Pt, b: Pt) =>
+  Math.abs(cross(a, b, p)) < 1e-12 &&
+  p[0] >= Math.min(a[0], b[0]) - 1e-12 &&
+  p[0] <= Math.max(a[0], b[0]) + 1e-12 &&
+  p[1] >= Math.min(a[1], b[1]) - 1e-12 &&
+  p[1] <= Math.max(a[1], b[1]) + 1e-12;
+
+/** 'on' means on the border; 'in' and 'out' are strict. */
+function locate(p: Pt, r: Pt[]): 'in' | 'on' | 'out' {
+  let inside = false;
+  for (let i = 0; i < r.length - 1; i++) {
+    const [a, b] = [r[i], r[i + 1]];
+    if (onSegment(p, a, b)) return 'on';
+    if (a[1] > p[1] !== b[1] > p[1] && p[0] < ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0]) inside = !inside;
+  }
+  return inside ? 'in' : 'out';
+}
+
+/** True if two edges cross at a point that is not a shared end point. */
+const properlyCross = (a: Pt, b: Pt, c: Pt, d: Pt) => cross(a, b, c) * cross(a, b, d) < 0 && cross(c, d, a) * cross(c, d, b) < 0;
+
+function isSimple(r: Pt[]): boolean {
+  const n = r.length - 1;
+  for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) if (properlyCross(r[i], r[i + 1], r[j], r[j + 1])) return false;
+  return new Set(r.slice(0, n).map(key)).size === n;
+}
+
+/** How many separate regions (cells that share a border edge count as one) a category forms. */
 function parts(zoning: ZoningCollection, category: string): number {
-  const mine = zoning.features.filter((f) => f.properties.category === category).map(rect);
+  const mine = zoning.features.filter((f) => f.properties.category === category).map((f) => new Set(edgesOf(ring(f))));
   const seen = new Set<number>();
   let count = 0;
   mine.forEach((_, i) => {
@@ -42,7 +61,7 @@ function parts(zoning: ZoningCollection, category: string): number {
       if (seen.has(k)) continue;
       seen.add(k);
       mine.forEach((m, j) => {
-        if (!seen.has(j) && touches(mine[k], m)) stack.push(j);
+        if (!seen.has(j) && [...m].some((e) => mine[k].has(e))) stack.push(j);
       });
     }
   });
@@ -50,22 +69,36 @@ function parts(zoning: ZoningCollection, category: string): number {
 }
 
 function checkZoning(zoning: ZoningCollection, segments: SegmentCollection) {
-  it('puts every segment point in exactly one zone', () => {
-    for (const seg of segments.features) for (const [x, y] of seg.geometry.coordinates) expect(zonesAt(zoning, x, y)).toHaveLength(1);
+  it('makes every zone a closed polygon that does not cross itself, and most are not 4-sided', () => {
+    for (const f of zoning.features) {
+      const r = ring(f);
+      expect(key(r[0])).toBe(key(r[r.length - 1]));
+      expect(isSimple(r), f.properties.name).toBe(true);
+    }
+    expect(zoning.features.filter((f) => ring(f).length - 1 > 4).length).toBeGreaterThan(zoning.features.length / 2);
   });
 
-  it('has no gaps or overlaps: zone areas add up to the outer box and no two overlap', () => {
-    const rs = zoning.features.map(rect);
-    const area = rs.reduce((a, r) => a + (r.e - r.w) * (r.n - r.s), 0);
-    const box = (Math.max(...rs.map((r) => r.e)) - Math.min(...rs.map((r) => r.w))) * (Math.max(...rs.map((r) => r.n)) - Math.min(...rs.map((r) => r.s)));
-    expect(area).toBeCloseTo(box, 12);
-    for (let i = 0; i < rs.length; i++) {
-      for (let j = i + 1; j < rs.length; j++) {
-        const ox = Math.min(rs[i].e, rs[j].e) - Math.max(rs[i].w, rs[j].w);
-        const oy = Math.min(rs[i].n, rs[j].n) - Math.max(rs[i].s, rs[j].s);
-        expect(ox > 1e-12 && oy > 1e-12).toBe(false);
+  it('puts every segment point in a zone and never strictly inside two', () => {
+    for (const seg of segments.features) {
+      for (const p of seg.geometry.coordinates) {
+        const where = zoning.features.map((f) => locate(p, ring(f)));
+        expect(where.filter((w) => w === 'in').length).toBeLessThanOrEqual(1);
+        expect(where.filter((w) => w !== 'out').length).toBeGreaterThanOrEqual(1);
       }
     }
+  });
+
+  it('has no gaps or overlaps: every border edge is shared by two zones or lies on the straight outer edge, and areas add up to the outer box', () => {
+    const uses = new Map<string, number>();
+    for (const f of zoning.features) for (const e of edgesOf(ring(f))) uses.set(e, (uses.get(e) ?? 0) + 1);
+    for (const n of uses.values()) expect(n).toBeLessThanOrEqual(2);
+    const outer = [...uses.entries()].filter(([, n]) => n === 1).map(([k]) => k.split('|').map((s) => s.split(',').map(Number)));
+    const xs = outer.flat().map((p) => p[0]);
+    const ys = outer.flat().map((p) => p[1]);
+    const [w, e, s, n] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+    for (const [a, b] of outer) expect((a[0] === b[0] && (a[0] === w || a[0] === e)) || (a[1] === b[1] && (a[1] === s || a[1] === n))).toBe(true);
+    const total = zoning.features.reduce((sum, f) => sum + areaOf(ring(f)), 0);
+    expect(total).toBeCloseTo((e - w) * (n - s), 10);
   });
 
   it('uses every category in at least 2 separate places', () => {
@@ -78,6 +111,10 @@ function checkZoning(zoning: ZoningCollection, segments: SegmentCollection) {
     for (const cat of Object.values(ZONING_CODES)) counts.set(cat, (counts.get(cat) ?? 0) + 1);
     expect([...counts.values()].some((n) => n >= 2)).toBe(true);
     for (const f of zoning.features) expect(ZONING_CODES[f.properties.zone_code]).toBe(f.properties.category);
+  });
+
+  it('is repeatable', () => {
+    expect(zoningToJson(generateZoning(segments, 'x'))).toBe(zoningToJson(generateZoning(segments, 'x')));
   });
 }
 

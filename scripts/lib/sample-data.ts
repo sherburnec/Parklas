@@ -15,7 +15,7 @@ type Window = { days: string[]; start: string; end: string; weeks_of_month?: num
 type Schedule = { windows: Window[] } | null;
 
 /** mulberry32: small, fast and identical on every machine. */
-function mulberry32(seed: number): Rng {
+export function mulberry32(seed: number): Rng {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;

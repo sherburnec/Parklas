@@ -1,10 +1,11 @@
 // Pure logic for the sample zoning polygons (task TD-3). No file I/O here: the CLI reads and writes the files.
 //
-// A grid of rectangles that tile the whole city. Each cut line is snapped to a real street, so a cell is
-// a group of whole blocks, not a parcel. Neighbouring cells share the exact same cut numbers, so there
-// are no gaps and no overlaps. The outer edge sits a little past the outermost streets.
+// A grid of cells that tile the whole city. Each grid line is snapped to a real street, then every inner
+// edge between two cells is wiggled by a few seeded points. Both neighbours get the same points (one walks
+// them backwards), so there are no gaps and no overlaps. The outer edge stays straight and sits a little
+// past the outermost streets.
 import type { SegmentCollection } from './build.ts';
-import { bboxOf } from './sample-data.ts';
+import { bboxOf, mulberry32, SAMPLE_SEED } from './sample-data.ts';
 
 export const ZONING_CATEGORIES = {
   residential: { label: 'Residential', hex: '#F4D35E' },
@@ -44,6 +45,8 @@ const ZONE_GRID = [
   ['SAMPLE-M1', 'SAMPLE-R1', 'SAMPLE-C2', 'SAMPLE-P', 'SAMPLE-C1'],
 ];
 const EDGE_MARGIN = 0.002; // degrees (about 200 m) past the outermost street
+const WIGGLE_AT = [0.2, 0.4, 0.6, 0.8]; // where along an inner edge a point is added
+const WIGGLE_MAX = 0.12; // furthest a point moves sideways, as a share of the smaller neighbouring cell. Under 0.2, so edges never cross
 
 /** The street coordinate (x for north-south streets, y for east-west) nearest each target. */
 function snapCuts(values: number[], targets: number[]): number[] {
@@ -79,20 +82,47 @@ export type ZoningCollection = {
   }[];
 };
 
+type Pt = [number, number];
+const round7 = (n: number) => Math.round(n * 1e7) / 1e7;
+
 export function generateZoning(segments: SegmentCollection, cityId: string): ZoningCollection {
   const { xs, ys } = zoningCuts(segments, ZONE_GRID[0].length, ZONE_GRID.length);
   if (xs.length - 1 !== ZONE_GRID[0].length || ys.length - 1 !== ZONE_GRID.length) {
     throw new Error('Street snapping merged two cut lines; the segments do not look like a grid');
   }
+  const rng = mulberry32(SAMPLE_SEED);
+  const width = (i: number) => xs[i + 1] - xs[i];
+  const height = (j: number) => ys[j + 1] - ys[j];
+  const sideways = (a: number, b: number) => (rng() * 2 - 1) * WIGGLE_MAX * Math.min(a, b);
+
+  // h[j][i]: points strictly between corners (i, j) and (i + 1, j), west to east. v[i][j]: between (i, j) and (i, j + 1), south to north.
+  const h = ys.map((y, j) =>
+    Array.from({ length: xs.length - 1 }, (_, i): Pt[] => {
+      if (j === 0 || j === ys.length - 1) return [];
+      return WIGGLE_AT.map((t) => [round7(xs[i] + t * width(i)), round7(y + sideways(height(j - 1), height(j)))]);
+    }),
+  );
+  const v = xs.map((x, i) =>
+    Array.from({ length: ys.length - 1 }, (_, j): Pt[] => {
+      if (i === 0 || i === xs.length - 1) return [];
+      return WIGGLE_AT.map((t) => [round7(x + sideways(width(i - 1), width(i))), round7(ys[j] + t * height(j))]);
+    }),
+  );
+
   const features: ZoningCollection['features'] = [];
   ZONE_GRID.forEach((rowCodes, r) => {
     rowCodes.forEach((code, c) => {
-      const [w, e] = [xs[c], xs[c + 1]];
-      const [n, s] = [ys[ys.length - 1 - r], ys[ys.length - 2 - r]]; // row 0 is the northernmost
+      const jn = ys.length - 1 - r; // row 0 is the northernmost
+      const js = jn - 1;
+      const nw: Pt = [xs[c], ys[jn]];
+      const ne: Pt = [xs[c + 1], ys[jn]];
+      const se: Pt = [xs[c + 1], ys[js]];
+      const sw: Pt = [xs[c], ys[js]];
+      const ring = [nw, ...h[jn][c], ne, ...[...v[c + 1][js]].reverse(), se, ...[...h[js][c]].reverse(), sw, ...v[c][js], nw];
       features.push({
         type: 'Feature',
         properties: { zone_code: code, category: ZONING_CODES[code], name: `${ZONE_NAMES[code]} (${r + 1},${c + 1})`, city_id: cityId },
-        geometry: { type: 'Polygon', coordinates: [[[w, n], [e, n], [e, s], [w, s], [w, n]]] },
+        geometry: { type: 'Polygon', coordinates: [ring] },
       });
     });
   });
