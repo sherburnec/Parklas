@@ -1,6 +1,6 @@
 import { createBasemap } from './basemap';
 import { bannerText, getDataSet, loadCity } from './data-loader';
-import { drawSweeping, drawZoning } from './layers';
+import { drawSweeping, drawTimedParking, drawZoning } from './layers';
 import type { TimeSelection } from './layers';
 
 const CITY_ID = 'burbank';
@@ -28,6 +28,9 @@ loadCity(CITY_ID)
     }
     void basemap.ready.then(() =>
       drawSweeping(basemap.map, city.sweeping, city.trim, SELECTED, city.city.time_zone, basemap.underLabelsLayerId),
+    );
+    void basemap.ready.then(() =>
+      drawTimedParking(basemap.map, city.timedParking, city.trim, SELECTED, city.city.time_zone, basemap.underLabelsLayerId),
     );
   })
   .catch((err: unknown) => {

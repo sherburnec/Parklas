@@ -1,5 +1,8 @@
 export { drawSweeping } from './draw-sweeping';
 export type { SweepingLayer } from './draw-sweeping';
+export { drawTimedParking } from './draw-timed-parking';
+export type { TimedParkingLayer } from './draw-timed-parking';
+export { FALLBACK_LIMIT_HEX, LIMIT_HEX, timedParkingStyle } from './timed-parking';
 export { drawZoning } from './draw-zoning';
 export { bandOffsetPx, bandWidthPx, layoutBands } from './bands';
 export type { BandLayout, HiddenBand } from './bands';

@@ -12,6 +12,11 @@ export function bandOffsetPx(index: number): number {
   return bandGeometry.first_offset_px + bandGeometry.offset_step_px * index;
 }
 
+/** The band index a rule layer draws in, from `band_slots` in the shared config. */
+export function bandSlot(layer: keyof typeof bandGeometry.band_slots): number {
+  return bandGeometry.band_slots[layer];
+}
+
 /** Drawn width at z17: the minimum overrides the nominal width. */
 export function bandWidthPx(): number {
   return Math.max(bandGeometry.min_width_px, bandGeometry.width_px);

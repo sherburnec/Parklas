@@ -2,6 +2,7 @@
 import type { SideCollection } from '../data-loader';
 import { instantFor, isActive } from '../schedule-engine';
 import type { Weekday } from '../schedule-engine';
+import { bandSlot } from './bands';
 
 /** The chosen day and hour. Hourly steps, so the hour is a whole number 0 to 23. */
 export interface TimeSelection {
@@ -10,7 +11,7 @@ export interface TimeSelection {
 }
 
 /** Sweeping is the first rule layer, so it takes the band nearest the street. */
-export const SWEEPING_BAND = 0;
+export const SWEEPING_BAND = bandSlot('sweeping');
 
 /**
  * Adds `active` (is the rule in force at this day and hour) and `sgn` (+1 draws right of the

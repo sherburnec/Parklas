@@ -5,6 +5,7 @@
   "width_px": 1,
   "min_width_px": 2,
   "band_count": 3,
+  "band_slots": { "sweeping": 0, "timed_parking": 1 },
   "metres_per_px_z17": 0.49,
   "trim_cap_share": 0.35,
   "sliver_max_m": 20,
