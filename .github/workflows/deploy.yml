@@ -26,6 +26,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run validate
+      # Builds every city folder under data/ into public/data/<city_id>/; Vite copies public/ into dist.
+      - run: npm run build:data
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
