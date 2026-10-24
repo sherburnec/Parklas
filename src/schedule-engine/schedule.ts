@@ -168,3 +168,18 @@ export function nextChange(
   }
   return null;
 }
+
+/** Sunday first, to match WEEKDAYS. January has no DST change, so every hour exists once. */
+const REFERENCE_SUNDAY = { year: 2026, month: 1, day: 4 };
+
+/**
+ * The instant at which the city clock reads this weekday and hour, in a fixed reference week
+ * (Sun 2026-01-04 to Sat 2026-01-10). Lets a day picker and hour slider drive isActive. The
+ * reference week is week 1 or 2 of January, so a window limited to other weeks of the month
+ * will not match it.
+ */
+export function instantFor(weekday: Weekday, hour: number, timeZone: string = DEFAULT_TIME_ZONE): Date {
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) throw new Error(`Invalid hour ${hour}, expected 0 to 23`);
+  const { year, month, day } = REFERENCE_SUNDAY;
+  return instantAt(year, month, day + WEEKDAYS.indexOf(weekday), hour * 60, timeZone);
+}

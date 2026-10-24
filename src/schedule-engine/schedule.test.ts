@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isActive, nextChange } from './index';
+import { instantFor, isActive, nextChange } from './index';
 import type { Schedule } from './index';
 
 // All instants are written in UTC. Burbank is UTC-8 (PST) until 2026-03-08
@@ -212,5 +212,32 @@ describe('daylight saving time', () => {
     expect(isActive(early, at('2026-11-01T09:30:00Z'))).toBe(true); // 01:30 PST
     expect(isActive(early, at('2026-11-01T10:00:00Z'))).toBe(false); // 02:00 PST
     expect(nextChange(early, at('2026-11-01T08:30:00Z'))).toEqual(at('2026-11-01T10:00:00Z'));
+  });
+});
+
+describe('instantFor', () => {
+  it('gives the instant a weekday and hour read on the city clock', () => {
+    // Reference week is Sun 2026-01-04 to Sat 2026-01-10, all PST (UTC-8).
+    expect(instantFor('mon', 8).toISOString()).toBe('2026-01-05T16:00:00.000Z');
+    expect(instantFor('sun', 0).toISOString()).toBe('2026-01-04T08:00:00.000Z');
+    expect(instantFor('sat', 23).toISOString()).toBe('2026-01-11T07:00:00.000Z');
+  });
+
+  it('uses the given time zone', () => {
+    expect(instantFor('mon', 8, 'UTC').toISOString()).toBe('2026-01-05T08:00:00.000Z');
+  });
+
+  it('feeds isActive so the hour flips a window on and off', () => {
+    const s: Schedule = { windows: [{ days: ['tue'], start: '08:00', end: '10:00' }] };
+    expect(isActive(s, instantFor('tue', 7))).toBe(false);
+    expect(isActive(s, instantFor('tue', 8))).toBe(true);
+    expect(isActive(s, instantFor('tue', 9))).toBe(true);
+    expect(isActive(s, instantFor('tue', 10))).toBe(false);
+    expect(isActive(s, instantFor('mon', 8))).toBe(false);
+  });
+
+  it('rejects an hour outside 0 to 23', () => {
+    expect(() => instantFor('mon', 24)).toThrow();
+    expect(() => instantFor('mon', 1.5)).toThrow();
   });
 });

@@ -1,8 +1,11 @@
 import { createBasemap } from './basemap';
 import { bannerText, getDataSet, loadCity } from './data-loader';
-import { drawZoning } from './layers';
+import { drawSweeping, drawZoning } from './layers';
+import type { TimeSelection } from './layers';
 
 const CITY_ID = 'burbank';
+// Hard-coded until the time controls exist (M4-2). Change the hour to see sweeping sides flip.
+const SELECTED: TimeSelection = { day: 'mon', hour: 8 };
 
 // The banner goes in before the map so the map is sized below it.
 const text = bannerText(getDataSet());
@@ -23,6 +26,9 @@ loadCity(CITY_ID)
     if (zoning && zoningCategories) {
       void basemap.ready.then(() => drawZoning(basemap.map, zoning, zoningCategories, basemap.underStreetsLayerId, app));
     }
+    void basemap.ready.then(() =>
+      drawSweeping(basemap.map, city.sweeping, SELECTED, city.city.time_zone, basemap.underLabelsLayerId),
+    );
   })
   .catch((err: unknown) => {
     const message = document.createElement('p');

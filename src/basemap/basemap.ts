@@ -71,6 +71,8 @@ export interface Basemap {
   map: maplibregl.Map;
   /** Rule layers that sit under the street lines are added before this layer id. */
   underStreetsLayerId: string;
+  /** Rule bands that must stay under the street names are added before this layer id. */
+  underLabelsLayerId: string;
   /** Resolves once the style and street lines are loaded. */
   ready: Promise<void>;
   destroy(): void;
@@ -118,5 +120,5 @@ export function createBasemap(
   });
 
   const ready = new Promise<void>((resolve) => map.once('load', () => resolve()));
-  return { map, underStreetsLayerId: 'segments-line', ready, destroy: () => map.remove() };
+  return { map, underStreetsLayerId: 'segments-line', underLabelsLayerId: 'segments-label', ready, destroy: () => map.remove() };
 }
