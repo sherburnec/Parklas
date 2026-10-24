@@ -1,6 +1,8 @@
 import type { ExpressionSpecification, GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
-import type { SideCollection } from '../data-loader';
-import { bandOffsetPx, bandWidthPx, SWEEPING_BAND, sweepingStyle } from './sweeping';
+import type { SideCollection, TrimData } from '../data-loader';
+import { bandOffsetPx, bandWidthPx, layoutBands } from './bands';
+import type { HiddenBand } from './bands';
+import { SWEEPING_BAND, sweepingStyle } from './sweeping';
 import type { TimeSelection } from './sweeping';
 
 const SOURCE_ID = 'sweeping';
@@ -15,6 +17,8 @@ const zoomScaled = (px: number): ExpressionSpecification => [
 export interface SweepingLayer {
   /** Restyle every side for a new day and hour. */
   update(at: TimeSelection): void;
+  /** Sides and slivers left off the map by the band flags. Their rows stay in the data for the click-through list. */
+  hidden: HiddenBand[];
 }
 
 /**
@@ -25,11 +29,13 @@ export interface SweepingLayer {
 export function drawSweeping(
   map: MapLibreMap,
   sweeping: SideCollection,
+  trim: TrimData,
   at: TimeSelection,
   timeZone: string,
   beforeLayerId: string,
 ): SweepingLayer {
-  map.addSource(SOURCE_ID, { type: 'geojson', data: sweepingStyle(sweeping, at, timeZone) });
+  const { drawn, hidden } = layoutBands(sweeping, trim);
+  map.addSource(SOURCE_ID, { type: 'geojson', data: sweepingStyle(drawn, at, timeZone) });
   // Inactive first so active bands are never hidden under them.
   for (const active of [false, true]) {
     for (const sgn of [1, -1] as const) {
@@ -52,8 +58,9 @@ export function drawSweeping(
     }
   }
   return {
+    hidden,
     update(next) {
-      (map.getSource(SOURCE_ID) as GeoJSONSource).setData(sweepingStyle(sweeping, next, timeZone));
+      (map.getSource(SOURCE_ID) as GeoJSONSource).setData(sweepingStyle(drawn, next, timeZone));
     },
   };
 }

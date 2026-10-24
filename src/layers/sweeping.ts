@@ -9,23 +9,6 @@ export interface TimeSelection {
   hour: number;
 }
 
-// Band geometry from docs/spike-notes.md. Values are pixels at z17; bands scale 2x per zoom
-// between z15 and z19 so they stay a fixed distance from the street in metres.
-const FIRST_OFFSET_PX = 2;
-const OFFSET_STEP_PX = 2;
-const WIDTH_PX = 1;
-const MIN_WIDTH_PX = 2;
-
-/** Distance of band `index` (0 is the band nearest the centerline) from the centerline at z17. */
-export function bandOffsetPx(index: number): number {
-  return FIRST_OFFSET_PX + OFFSET_STEP_PX * index;
-}
-
-/** Drawn width at z17: the minimum overrides the nominal width. */
-export function bandWidthPx(): number {
-  return Math.max(MIN_WIDTH_PX, WIDTH_PX);
-}
-
 /** Sweeping is the first rule layer, so it takes the band nearest the street. */
 export const SWEEPING_BAND = 0;
 

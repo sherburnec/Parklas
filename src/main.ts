@@ -27,7 +27,7 @@ loadCity(CITY_ID)
       void basemap.ready.then(() => drawZoning(basemap.map, zoning, zoningCategories, basemap.underStreetsLayerId, app));
     }
     void basemap.ready.then(() =>
-      drawSweeping(basemap.map, city.sweeping, SELECTED, city.city.time_zone, basemap.underLabelsLayerId),
+      drawSweeping(basemap.map, city.sweeping, city.trim, SELECTED, city.city.time_zone, basemap.underLabelsLayerId),
     );
   })
   .catch((err: unknown) => {

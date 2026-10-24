@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { bandOffsetPx, bandWidthPx } from '../../src/layers/sweeping.ts';
+import { bandOffsetPx, bandWidthPx } from '../../src/layers/bands.ts';
 import { buildTrim, bandReachMetres, type BandConfig } from './trim.ts';
 import type { SegmentCollection } from './segments.ts';
 
@@ -38,7 +38,7 @@ describe('band config', () => {
     expect(reach).toBeLessThan(3.6);
   });
 
-  it('matches the constants the sweeping layer still hard-codes (until M3-10 replaces them)', () => {
+  it('is what the layers draw with: they read the same file', () => {
     for (let i = 0; i < config.band_count; i++) expect(bandOffsetPx(i)).toBe(config.first_offset_px + config.offset_step_px * i);
     expect(bandWidthPx()).toBe(Math.max(config.min_width_px, config.width_px));
   });

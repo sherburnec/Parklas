@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Schedule, SideCollection } from '../data-loader';
 import { instantFor } from '../schedule-engine';
-import { bandOffsetPx, bandWidthPx, sweepingStyle } from './sweeping';
+import { sweepingStyle } from './sweeping';
 
 const side = (schedule: Schedule, offset: 'left' | 'right' = 'left') => ({
   type: 'Feature' as const,
@@ -47,17 +47,5 @@ describe('sweepingStyle', () => {
     const at = { day: 'mon' as const, hour: 8 };
     expect(instantFor(at.day, at.hour, 'UTC').toISOString()).toBe('2026-01-05T08:00:00.000Z');
     expect(sweepingStyle(collection(side(mon8to10)), at, 'UTC').features[0].properties.active).toBe(true);
-  });
-});
-
-describe('band geometry from the spike notes', () => {
-  it('first band sits 2 px from the centerline, 2 px wide, at z17', () => {
-    expect(bandOffsetPx(0)).toBe(2);
-    expect(bandWidthPx()).toBe(2);
-  });
-
-  it('later bands step out by 2 px', () => {
-    expect(bandOffsetPx(1)).toBe(4);
-    expect(bandOffsetPx(2)).toBe(6);
   });
 });
