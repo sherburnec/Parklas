@@ -1,7 +1,8 @@
 // Build the per-layer GeoJSON the page loads (task M2-4).
 //
-//   npm run build:data                 all cities under data/
-//   npm run build:data -- burbank      one city
+//   npm run build:data                 every folder in the DATA_SET (sample by default)
+//   DATA_SET=real npm run build:data   the real city folders
+//   npm run build:data -- burbank      one named folder, whatever the DATA_SET
 //
 // Runs the validator first and stops without writing anything if it finds a problem.
 // Output goes to public/data/<city_id>/.
@@ -9,6 +10,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFi
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildLayers, parseRuleRows, type SegmentCollection } from './lib/build.ts';
+import { citiesToProcess, loadCityFiles, parseDataSet } from './lib/data-set.ts';
 import { validateCity } from './lib/validate.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -20,10 +22,14 @@ const schemas = readdirSync(schemaDir)
   .filter((f) => f.endsWith('.json'))
   .map((f) => JSON.parse(readFileSync(resolve(schemaDir, f), 'utf8')) as object);
 
-const requested = process.argv.slice(2);
-const cities = requested.length
-  ? requested
-  : readdirSync(dataDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+let dataSet;
+try {
+  dataSet = parseDataSet(process.env.DATA_SET);
+} catch (err) {
+  console.error((err as Error).message);
+  process.exit(1);
+}
+const cities = citiesToProcess(dataDir, process.argv.slice(2), dataSet);
 
 // Validate every city before writing anything.
 const folders = new Map<string, Record<string, string>>();
@@ -35,10 +41,7 @@ for (const city of cities) {
     problems++;
     continue;
   }
-  const files: Record<string, string> = {};
-  for (const f of readdirSync(dir, { withFileTypes: true })) {
-    if (f.isFile()) files[f.name] = readFileSync(resolve(dir, f.name), 'utf8');
-  }
+  const files = loadCityFiles(dataDir, city);
   for (const p of validateCity(files, schemas)) {
     console.error(`data/${city}/${p.file}${p.row === null ? '' : `, row ${p.row}`}: ${p.reason}`);
     problems++;
@@ -53,7 +56,10 @@ if (problems > 0) {
 const write = (path: string, data: unknown) => writeFileSync(path, JSON.stringify(data) + '\n');
 
 for (const [city, files] of folders) {
-  const segments = JSON.parse(files['segments.geojson'] ?? '{"type":"FeatureCollection","features":[]}') as SegmentCollection;
+  const allSegments = JSON.parse(files['segments.geojson'] ?? '{"type":"FeatureCollection","features":[]}') as SegmentCollection;
+  // A sample set covers only its area.json; the validator has already checked every id exists.
+  const area = files['area.json'] ? new Set((JSON.parse(files['area.json']) as { segment_ids: string[] }).segment_ids) : null;
+  const segments = area ? { ...allSegments, features: allSegments.features.filter((f) => area.has(f.properties.segment_id)) } : allSegments;
   const rows = parseRuleRows(files['rules.csv'] ?? '');
   let built;
   try {

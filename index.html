@@ -5,7 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Curb &amp; Zoning Map</title>
     <style>
-      html, body, #app { height: 100%; margin: 0; }
+      html, body { height: 100%; margin: 0; }
+      body { display: flex; flex-direction: column; }
+      #app { flex: 1; min-height: 0; }
+      #data-banner {
+        padding: 6px 12px; text-align: center;
+        font: 600 14px system-ui, sans-serif; color: #5c3b00; background: #ffd966;
+      }
     </style>
   </head>
   <body>

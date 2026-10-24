@@ -9,6 +9,12 @@ Everything here is typed by hand. Each city has its own folder, `data/<city_id>/
 | Zoning areas | `zoning.geojson` and `zoning-categories.json` | `templates/zoning.example.geojson`, `templates/zoning-categories.json` |
 | Permit zones | `permit-zones.geojson` | `templates/permit-zones.example.geojson` |
 
+## Sample data set
+
+`data/burbank-sample/` is made-up data for building and testing the layers. Its zone codes start with `SAMPLE-` and its permit codes with `DEMO-`; the validator rejects anything else. `area.json` lists the ~30 connected Burbank segments it covers (rows outside that list are rejected). It borrows `data/burbank/segments.geojson` and never copies it.
+
+The `DATA_SET` setting picks which folders `validate`, `build:data` and the page use: `sample` (the default) uses folders named `<city_id>-sample`, `real` uses the others. In PowerShell: `$env:DATA_SET='real'; npm run validate`. When the page uses the sample set it shows "Sample data. Not real Burbank rules."
+
 Never edit `segments.geojson`. It is the street list and must not change.
 
 ## 1. Find a segment_id

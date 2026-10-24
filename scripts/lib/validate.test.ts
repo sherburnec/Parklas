@@ -219,3 +219,96 @@ describe('validateCity', () => {
     expect(problems.map((p) => p.file).sort()).toEqual(['city.json', 'notes.txt']);
   });
 });
+
+describe('sample data set', () => {
+  function sampleCity(): Record<string, string> {
+    return {
+      'city.json': JSON.stringify({ city_id: 'testville-sample', name: 'Testville (sample)', time_zone: 'America/Los_Angeles' }),
+      'segments.geojson': goodCity()['segments.geojson'],
+      'area.json': JSON.stringify({ city_id: 'testville-sample', segments_from: 'testville', segment_ids: ['seg-1'] }),
+      'rules.csv': HEADER,
+      'zoning.geojson': JSON.stringify({ type: 'FeatureCollection', features: [] }),
+      'permit-zones.geojson': JSON.stringify({ type: 'FeatureCollection', features: [] }),
+      'curb-colors.json': JSON.stringify({ city_id: 'testville-sample', colors: {} }),
+      'zoning-categories.json': JSON.stringify({ city_id: 'testville-sample', categories: {}, zone_codes: {} }),
+    };
+  }
+
+  const zone = (code: string) => ({
+    type: 'Feature',
+    properties: { zone_code: code, category: 'residential', name: 'Fake', city_id: 'testville-sample' },
+    geometry: { type: 'Polygon', coordinates: square },
+  });
+
+  it('accepts an empty sample set', () => {
+    expect(validateCity(sampleCity(), schemas)).toEqual([]);
+  });
+
+  it('reports an area segment_id that is not in the segments file', () => {
+    const files = sampleCity();
+    files['area.json'] = JSON.stringify({ city_id: 'testville-sample', segments_from: 'testville', segment_ids: ['seg-1', 'ghost'] });
+    const problems = validateCity(files, schemas);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatchObject({ file: 'area.json', row: 2 });
+    expect(problems[0].reason).toContain('ghost');
+  });
+
+  it('reports an empty or duplicated area list', () => {
+    const files = sampleCity();
+    files['area.json'] = JSON.stringify({ city_id: 'testville-sample', segments_from: 'testville', segment_ids: [] });
+    expect(validateCity(files, schemas)).toHaveLength(1);
+    files['area.json'] = JSON.stringify({ city_id: 'testville-sample', segments_from: 'testville', segment_ids: ['seg-1', 'seg-1'] });
+    expect(validateCity(files, schemas)).toHaveLength(1);
+  });
+
+  it('reports a rule row outside the sample area', () => {
+    const files = sampleCity();
+    const seg = JSON.parse(files['segments.geojson']);
+    seg.features.push({ ...seg.features[0], properties: { ...seg.features[0].properties, segment_id: 'seg-2' } });
+    files['segments.geojson'] = JSON.stringify(seg);
+    files['rules.csv'] += '\nseg-2,N,sweeping,,,,,';
+    const problems = validateCity(files, schemas);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatchObject({ file: 'rules.csv', row: 2 });
+    expect(problems[0].reason).toContain('area.json');
+  });
+
+  it('requires zone codes to start with SAMPLE-', () => {
+    const files = sampleCity();
+    files['zoning-categories.json'] = JSON.stringify({
+      city_id: 'testville-sample',
+      categories: { residential: { label: 'Residential', hex: '#FFEEAA' } },
+      zone_codes: { 'SAMPLE-R1': 'residential', R2: 'residential' },
+    });
+    files['zoning.geojson'] = JSON.stringify({ type: 'FeatureCollection', features: [zone('SAMPLE-R1'), zone('R2')] });
+    const problems = validateCity(files, schemas);
+    expect(problems.map((p) => [p.file, p.row])).toEqual([
+      ['zoning-categories.json', null],
+      ['zoning.geojson', 2],
+    ]);
+    expect(problems.every((p) => p.reason.includes('SAMPLE-'))).toBe(true);
+  });
+
+  it('requires permit codes to start with DEMO-', () => {
+    const files = sampleCity();
+    const permit = (code: string) => ({
+      type: 'Feature',
+      properties: { permit_code: code, name: 'Fake', city_id: 'testville-sample' },
+      geometry: { type: 'Polygon', coordinates: square },
+    });
+    files['permit-zones.geojson'] = JSON.stringify({ type: 'FeatureCollection', features: [permit('DEMO-A'), permit('A')] });
+    files['rules.csv'] += '\nseg-1,N,timed_parking,,120,DEMO-A,,\nseg-1,S,timed_parking,,120,B,,';
+    const problems = validateCity(files, schemas);
+    expect(problems.map((p) => [p.file, p.row])).toEqual([
+      ['permit-zones.geojson', 2],
+      ['rules.csv', 3],
+    ]);
+    expect(problems.every((p) => p.reason.includes('DEMO-'))).toBe(true);
+  });
+
+  it('does not apply the fake-code prefixes to a real city', () => {
+    const files = goodCity();
+    files['rules.csv'] += '\nseg-1,W,timed_parking,,60,A,,';
+    expect(validateCity(files, schemas)).toEqual([]);
+  });
+});

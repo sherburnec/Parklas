@@ -25,7 +25,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      # DATA_SET defaults to sample. The real folders are still validated on every push.
       - run: npm run validate
+      - run: DATA_SET=real npm run validate
       # Builds every city folder under data/ into public/data/<city_id>/; Vite copies public/ into dist.
       - run: npm run build:data
       - run: npm run build

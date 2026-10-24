@@ -10,7 +10,6 @@
     "city_id": { "type": "string", "pattern": "^[a-z0-9_-]+$" },
     "colors": {
       "type": "object",
-      "minProperties": 1,
       "propertyNames": { "pattern": "^[a-z0-9_]+$" },
       "additionalProperties": {
         "type": "object",

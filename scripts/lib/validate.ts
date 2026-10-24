@@ -13,6 +13,7 @@ const SCHEMA_BY_FILE: Record<string, string> = {
   'segments.geojson': 'segments',
   'zoning.geojson': 'zoning',
   'permit-zones.geojson': 'permit-zones',
+  'area.json': 'area',
   'curb-colors.json': 'curb-colors-config',
   'zoning-categories.json': 'zoning-categories-config',
 };
@@ -175,6 +176,15 @@ export function validateCity(files: Record<string, string>, schemas: object[]): 
   const segmentIds = new Set<string>(
     (parsed['segments.geojson']?.features ?? []).map((f: any) => f?.properties?.segment_id).filter(Boolean), // eslint-disable-line @typescript-eslint/no-explicit-any
   );
+  // A sample set (city_id ending -sample) keeps to its area.json and uses obviously fake codes.
+  const sample = String(parsed['city.json']?.city_id ?? '').endsWith('-sample');
+  const area = parsed['area.json']?.segment_ids as string[] | undefined;
+  const areaIds = new Set<string>(Array.isArray(area) ? area : []);
+  if (Array.isArray(area)) {
+    area.forEach((id, i) => {
+      if (!segmentIds.has(id)) add('area.json', i + 1, `segment_id "${id}" is not in segments.geojson`);
+    });
+  }
   const colorKeys = new Set<string>(Object.keys(parsed['curb-colors.json']?.colors ?? {}));
   const hasColors = 'curb-colors.json' in parsed;
 
@@ -185,17 +195,33 @@ export function validateCity(files: Record<string, string>, schemas: object[]): 
       if (!(cat in cfg.categories)) {
         add('zoning-categories.json', null, `Zone code "${code}" maps to category "${cat}", which is not defined under "categories"`);
       }
+      if (sample && !code.startsWith('SAMPLE-')) {
+        add('zoning-categories.json', null, `Zone code "${code}" must start with SAMPLE- in a sample data set`);
+      }
     }
   }
   if (parsed['zoning.geojson']?.features) {
     (parsed['zoning.geojson'].features as any[]).forEach((f, i) => { // eslint-disable-line @typescript-eslint/no-explicit-any
       const code = f?.properties?.zone_code;
+      if (sample && typeof code === 'string' && !code.startsWith('SAMPLE-')) {
+        add('zoning.geojson', i + 1, `Zone code "${code}" must start with SAMPLE- in a sample data set`);
+      }
       if (typeof code !== 'string' || !cfg?.zone_codes) return;
       const mapped = cfg.zone_codes[code];
       if (mapped === undefined) {
         add('zoning.geojson', i + 1, `Zone code "${code}" has no category in zoning-categories.json (add it under "zone_codes")`);
       } else if (f.properties.category !== mapped) {
         add('zoning.geojson', i + 1, `Zone code "${code}" is marked "${f.properties.category}" here but zoning-categories.json maps it to "${mapped}"`);
+      }
+    });
+  }
+
+  // Permit zones.
+  if (sample && parsed['permit-zones.geojson']?.features) {
+    (parsed['permit-zones.geojson'].features as any[]).forEach((f, i) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      const code = f?.properties?.permit_code;
+      if (typeof code === 'string' && !code.startsWith('DEMO-')) {
+        add('permit-zones.geojson', i + 1, `Permit code "${code}" must start with DEMO- in a sample data set`);
       }
     });
   }
@@ -243,6 +269,11 @@ export function validateCity(files: Record<string, string>, schemas: object[]): 
       if (!validateRow(rec)) for (const reason of explain(validateRow.errors ?? [])) add(file, n, reason);
       if (typeof rec.segment_id === 'string' && !segmentIds.has(rec.segment_id)) {
         add(file, n, `segment_id "${rec.segment_id}" is not in segments.geojson`);
+      } else if (typeof rec.segment_id === 'string' && Array.isArray(area) && !areaIds.has(rec.segment_id)) {
+        add(file, n, `segment_id "${rec.segment_id}" is not in area.json (a sample set only covers its area)`);
+      }
+      if (sample && typeof rec.permit_code === 'string' && !rec.permit_code.startsWith('DEMO-')) {
+        add(file, n, `permit_code "${rec.permit_code}" must start with DEMO- in a sample data set`);
       }
       if (typeof rec.color_key === 'string' && !colorKeys.has(rec.color_key)) {
         add(

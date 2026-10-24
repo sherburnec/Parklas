@@ -1,12 +1,14 @@
 // Validate every file in data/<city_id>/ (task M2-3).
 //
-//   npm run validate                 all cities under data/
-//   npm run validate -- burbank      one city
+//   npm run validate                 every folder in the DATA_SET (sample by default)
+//   DATA_SET=real npm run validate   the real city folders
+//   npm run validate -- burbank      one named folder, whatever the DATA_SET
 //
 // Prints one line per problem (file, row, reason) and exits 1 if there are any.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { citiesToProcess, loadCityFiles, parseDataSet } from './lib/data-set.ts';
 import { validateCity, type Problem } from './lib/validate.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -17,10 +19,14 @@ const schemas = readdirSync(schemaDir)
   .filter((f) => f.endsWith('.json'))
   .map((f) => JSON.parse(readFileSync(resolve(schemaDir, f), 'utf8')) as object);
 
-const requested = process.argv.slice(2);
-const cities = requested.length
-  ? requested
-  : readdirSync(dataDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+let dataSet;
+try {
+  dataSet = parseDataSet(process.env.DATA_SET);
+} catch (err) {
+  console.error((err as Error).message);
+  process.exit(1);
+}
+const cities = citiesToProcess(dataDir, process.argv.slice(2), dataSet);
 
 let total = 0;
 for (const city of cities) {
@@ -30,10 +36,7 @@ for (const city of cities) {
     total++;
     continue;
   }
-  const files: Record<string, string> = {};
-  for (const f of readdirSync(dir, { withFileTypes: true })) {
-    if (f.isFile()) files[f.name] = readFileSync(resolve(dir, f.name), 'utf8');
-  }
+  const files = loadCityFiles(dataDir, city);
   const problems: Problem[] = validateCity(files, schemas);
   for (const p of problems) {
     console.error(`data/${city}/${p.file}${p.row === null ? '' : `, row ${p.row}`}: ${p.reason}`);
