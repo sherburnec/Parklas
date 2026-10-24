@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildLayers, parseRuleRows, type RuleRow, type SegmentCollection } from './build.ts';
-import { cellOf, generateSampleRows, rowsToCsv } from './sample-data.ts';
+import { cellOf, generateSampleRows, permitCodeAt, rowsToCsv, SAMPLE_SEED, zoneAt, type PermitZoneCollection } from './sample-data.ts';
+import { generateZoning } from './sample-zoning.ts';
 
 // A 60 x 60 street grid over Burbank's extent: alternating east-west and north-south blocks.
 function gridSegments(): SegmentCollection {
@@ -159,6 +160,71 @@ describe('day-by-day sweeping (TD-4)', () => {
   });
 });
 
+// Timed parking spread (TD-5), checked against the real segments, zoning and permit zones.
+describe('timed parking spread (TD-5)', () => {
+  const data = resolve(import.meta.dirname, '..', '..', 'data');
+  const real = JSON.parse(readFileSync(resolve(data, 'burbank', 'segments.geojson'), 'utf8')) as SegmentCollection;
+  const permitZones = JSON.parse(readFileSync(resolve(data, 'burbank-sample', 'permit-zones.geojson'), 'utf8')) as PermitZoneCollection;
+  const context = { zoning: generateZoning(real, 'burbank-sample'), permitZones };
+  const rows = generateSampleRows(real, SAMPLE_SEED, context);
+  const timed = rows.filter((r) => r.layer === 'timed_parking');
+  const realById = new Map(real.features.map((f) => [f.properties.segment_id, f]));
+  const category = (id: string) => zoneAt(realById.get(id)!, context.zoning)?.properties.category;
+  const commercialish = (id: string) => ['commercial', 'mixed_use'].includes(category(id) ?? '');
+
+  it('is repeatable and leaves every other layer exactly as before', () => {
+    expect(generateSampleRows(real, SAMPLE_SEED, context)).toEqual(rows);
+    const others = (rs: RuleRow[]) => rs.filter((r) => r.layer !== 'timed_parking');
+    expect(others(rows)).toEqual(others(generateSampleRows(real, SAMPLE_SEED)));
+  });
+
+  it('adds timed rows and keeps unmapped blocks far more common than mapped ones', () => {
+    const before = generateSampleRows(real, SAMPLE_SEED);
+    expect(timed.length).toBeGreaterThan(before.filter((r) => r.layer === 'timed_parking').length);
+    const mapped = new Set(rows.map((r) => r.segment_id)).size;
+    expect(mapped).toBeLessThan(real.features.length / 10);
+  });
+
+  it('uses 30, 60, 120, 180 and 240 minutes, each in at least 2 parts of the city', () => {
+    for (const limit of [30, 60, 120, 180, 240]) {
+      const cells = new Set(timed.filter((r) => r.limit_minutes === limit).map((r) => cellOf(realById.get(r.segment_id)!, real, 3)));
+      expect(cells.size, `${limit} min`).toBeGreaterThanOrEqual(2);
+    }
+    expect(new Set(timed.map((r) => r.limit_minutes))).toEqual(new Set([30, 60, 120, 180, 240]));
+  });
+
+  it('favours commercial and mixed-use zones over their share of the city', () => {
+    const share = (ids: string[]) => ids.filter(commercialish).length / ids.length;
+    const cityShare = share(real.features.map((f) => f.properties.segment_id));
+    expect(share(timed.map((r) => r.segment_id))).toBeGreaterThan(cityShare * 1.5);
+    expect(timed.some((r) => !commercialish(r.segment_id))).toBe(true); // still spread beyond them
+  });
+
+  it('gives most rows a schedule, a few none, and includes Mon-Sat 08:00-18:00', () => {
+    const none = timed.filter((r) => r.schedule === null).length;
+    expect(none).toBeGreaterThan(0);
+    expect(none).toBeLessThan(timed.length / 4);
+    const monSat = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    expect(timed.some((r) => windowsOf(r).some((w) => w.start === '08:00' && w.end === '18:00' && w.days.join() === monSat.join()))).toBe(true);
+  });
+
+  it('puts some timed rows on a side that also has sweeping', () => {
+    const swept = new Set(rows.filter((r) => r.layer === 'sweeping').map((r) => `${r.segment_id}|${r.side}`));
+    expect(timed.filter((r) => swept.has(`${r.segment_id}|${r.side}`)).length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('adds DEMO- permit codes to a few rows inside the matching permit zone', () => {
+    const inZone = timed.filter((r) => r.permit_code !== null && permitCodeAt(realById.get(r.segment_id)!, permitZones) === r.permit_code);
+    expect(inZone.length).toBeGreaterThanOrEqual(3);
+    expect(inZone.length).toBeLessThan(timed.length / 4); // "a few"
+    expect(new Set(inZone.map((r) => r.permit_code)).size).toBeGreaterThanOrEqual(2);
+  });
+
+  it('writes no duplicate (segment, side) timed rows', () => {
+    expect(new Set(timed.map((r) => `${r.segment_id}|${r.side}`)).size).toBe(timed.length);
+  });
+});
+
 describe('rowsToCsv', () => {
   it('round-trips through the build script parser', () => {
     const rows = generateSampleRows(segments, SEED);
@@ -178,7 +244,9 @@ describe('data/burbank-sample', () => {
   const rows = parseRuleRows(csv);
 
   it('is exactly what the generator writes (seed 20261023)', () => {
-    expect(csv.replace(/\r\n/g, '\n')).toBe(rowsToCsv(generateSampleRows(real, 20261023)));
+    const permitZones = JSON.parse(readFileSync(resolve(root, 'burbank-sample', 'permit-zones.geojson'), 'utf8')) as PermitZoneCollection;
+    const context = { zoning: generateZoning(real, 'burbank-sample'), permitZones };
+    expect(csv.replace(/\r\n/g, '\n')).toBe(rowsToCsv(generateSampleRows(real, 20261023, context)));
   });
 
   it('has rows for every rule layer in at least 4 distinct parts of the city', () => {

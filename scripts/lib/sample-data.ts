@@ -3,6 +3,7 @@
 // Picks about 1 in 15 segments, spread over the whole city, and gives each some made-up rules.
 // Everything random comes from a seeded generator, so the same segments and seed give the same rows.
 import type { RuleRow, SegmentCollection, Side } from './build.ts';
+import type { ZoningCollection } from './sample-zoning.ts';
 
 export const SAMPLE_SEED = 20261023;
 const ONE_IN = 15;
@@ -177,7 +178,107 @@ const LAYER_ODDS: [Layer, number][] = [
   ['curb_color', 0.35],
 ];
 
-export function generateSampleRows(segments: SegmentCollection, seed: number): RuleRow[] {
+export type PermitZoneCollection = {
+  features: { properties: { permit_code: string }; geometry: { coordinates: number[][][] } }[];
+};
+/** The polygon files the timed parking spread reads (task TD-5). Without them the rows are exactly as TD-2 wrote them. */
+export type SampleContext = { zoning: ZoningCollection; permitZones: PermitZoneCollection };
+
+function inRing(x: number, y: number, ring: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+const middleOf = (segment: Segment): [number, number] => {
+  const line = segment.geometry.coordinates;
+  return line[Math.floor(line.length / 2)] as [number, number];
+};
+
+/** The zoning polygon holding a segment's middle point, if any. */
+export function zoneAt(segment: Segment, zoning: ZoningCollection): ZoningCollection['features'][number] | undefined {
+  const [x, y] = middleOf(segment);
+  return zoning.features.find((z) => inRing(x, y, z.geometry.coordinates[0]));
+}
+
+/** The permit code of the permit zone holding a segment's middle point, if any. */
+export function permitCodeAt(segment: Segment, permitZones: PermitZoneCollection): string | null {
+  const [x, y] = middleOf(segment);
+  return permitZones.features.find((z) => inRing(x, y, z.geometry.coordinates[0]))?.properties.permit_code ?? null;
+}
+
+// Timed parking spread (task TD-5). Limits cycle through this list, so every one lands in several parts of the city;
+// 30 is the odd value that tests the fallback style.
+const SPREAD_LIMITS = [60, 120, 180, 240, 60, 120, 180, 240, 30];
+const ADD_MAPPED_COMMERCIAL = 0.6; // chance a segment already mapped in a commercial or mixed-use zone gets a timed row
+const ADD_MAPPED_ELSEWHERE = 0.06;
+const ADD_NEW_COMMERCIAL = 0.04; // chance an unmapped one is mapped, with timed parking only
+const ADD_NEW_ELSEWHERE = 0.003;
+const ADD_IN_PERMIT_ZONE = 0.5; // for mapped segments inside a permit zone
+const PERMIT_ON_ROW = 0.55;
+const ON_SWEPT_SIDE = 0.5;
+
+function spreadSchedule(rng: Rng): Schedule {
+  const r = rng();
+  if (r < 0.12) return null; // always in force
+  if (r < 0.52) return win(MON_SAT, '08:00', '18:00');
+  if (r < 0.82) return win(WEEKDAYS, '08:00', '18:00');
+  return win(MON_SAT, '09:00', '18:00');
+}
+
+/**
+ * Adds timed parking, mostly where the zoning is commercial or mixed use: on segments already mapped and on a few
+ * more (timed parking only; unmapped blocks still far outnumber mapped ones). It also puts the matching DEMO- permit
+ * code on a few rows inside a permit zone.
+ * Uses its own generator, so the other layers' rows do not move.
+ */
+function spreadTimedParking(rows: RuleRow[], segments: SegmentCollection, ctx: SampleContext, seed: number): RuleRow[] {
+  const rng = mulberry32((seed ^ 0x54494d45) >>> 0);
+  const byId = new Map(segments.features.map((f) => [f.properties.segment_id, f]));
+  const timedSides = new Map<string, Set<Side>>();
+  const sweptSides = new Map<string, Side[]>();
+  for (const r of rows) {
+    if (r.layer === 'timed_parking') timedSides.set(r.segment_id, new Set([...(timedSides.get(r.segment_id) ?? []), r.side]));
+    if (r.layer === 'sweeping') sweptSides.set(r.segment_id, [...(sweptSides.get(r.segment_id) ?? []), r.side]);
+  }
+  const permitOf = (id: string) => permitCodeAt(byId.get(id)!, ctx.permitZones);
+
+  let n = 0;
+  const out: RuleRow[] = [];
+  const rowsOf = new Map<string, RuleRow[]>();
+  for (const r of rows) rowsOf.set(r.segment_id, [...(rowsOf.get(r.segment_id) ?? []), r]);
+  for (const segment of segments.features) {
+    const id = segment.properties.segment_id;
+    const own = (rowsOf.get(id) ?? []).map((r) => {
+      // Existing timed rows inside a permit zone also get the zone's code now and then.
+      const permit = r.layer === 'timed_parking' && r.permit_code === null ? permitOf(id) : null;
+      return permit && chance(PERMIT_ON_ROW, rng) ? { ...r, permit_code: permit } : r;
+    });
+    out.push(...own);
+    if (timedSides.has(id)) continue;
+    const category = zoneAt(segment, ctx.zoning)?.properties.category;
+    const commercial = category === 'commercial' || category === 'mixed_use';
+    const permit = permitOf(id);
+    const mapped = own.length > 0;
+    const p = commercial ? (mapped ? ADD_MAPPED_COMMERCIAL : ADD_NEW_COMMERCIAL) : mapped ? ADD_MAPPED_ELSEWHERE : ADD_NEW_ELSEWHERE;
+    if (!chance(permit && mapped ? Math.max(p, ADD_IN_PERMIT_ZONE) : p, rng)) continue;
+    const swept = sweptSides.get(id);
+    const side = swept && chance(ON_SWEPT_SIDE, rng) ? pick(swept, rng) : pick(SIDES, rng);
+    out.push({
+      segment_id: id, side, layer: 'timed_parking', type: null, color_key: null,
+      limit_minutes: SPREAD_LIMITS[n++ % SPREAD_LIMITS.length],
+      permit_code: permit && chance(PERMIT_ON_ROW, rng) ? permit : null,
+      schedule: spreadSchedule(rng),
+    });
+  }
+  return out;
+}
+
+export function generateSampleRows(segments: SegmentCollection, seed: number, context?: SampleContext): RuleRow[] {
   const rng = mulberry32(seed);
   const picked = pickSegments(segments, rng);
   const rows: RuleRow[] = [];
@@ -193,7 +294,7 @@ export function generateSampleRows(segments: SegmentCollection, seed: number): R
       else rows.push(rowFor(layer, id, pick(SIDES, rng), rng));
     }
   }
-  return rows;
+  return context ? spreadTimedParking(rows, segments, context, seed) : rows;
 }
 
 const HEADER = 'segment_id,side,layer,type,limit_minutes,permit_code,color_key,schedule';
