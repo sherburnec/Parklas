@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>M1-3 band spike</title>
+    <style>
+      html, body, #map { height: 100%; margin: 0; font: 12px system-ui, sans-serif; }
+      #panel { position: absolute; top: 8px; left: 8px; background: #fffd; padding: 8px 10px; border-radius: 4px; }
+      #panel label { display: grid; grid-template-columns: 90px 120px 36px; gap: 6px; align-items: center; }
+      #zoom { margin-top: 4px; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="panel">
+      <label>first offset px <input id="first" type="range" min="2" max="14" step="0.5" /><span></span></label>
+      <label>step px <input id="step" type="range" min="2" max="10" step="0.5" /><span></span></label>
+      <label>width px (z17) <input id="width" type="range" min="1" max="8" step="0.5" /><span></span></label>
+      <label>min width px <input id="minw" type="range" min="1" max="4" step="0.5" /><span></span></label>
+      <label>end trim m <input id="trim" type="range" min="0" max="20" step="0.5" /><span></span></label>
+      <div id="zoom"></div>
+    </div>
+    <script type="module" src="./spike.ts"></script>
+  </body>
+</html>
