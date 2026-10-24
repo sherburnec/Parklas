@@ -34,7 +34,7 @@ const STYLE: maplibregl.StyleSpecification = {
       layout: {
         'symbol-placement': 'line',
         'text-field': ['get', 'street'],
-        'text-font': ['Open Sans Regular'],
+        'text-font': ['Noto Sans Regular'],
         'text-size': 11,
       },
       paint: {
