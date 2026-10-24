@@ -109,6 +109,31 @@ function sweepingSchedule(rng: Rng): Schedule {
   return win([day], start, end);
 }
 
+const AREA_GRID = 4; // sweeping areas: a 4 x 4 grid over the city, checkerboard cells (half the city) get day-by-day sweeping
+
+/**
+ * Day-by-day sweeping for the checkerboard half of the city (task TD-4). Each area gets its own pair of
+ * consecutive weekdays, so the two sides of a block sweep on different days and neighbouring areas differ.
+ * Returns null outside those areas.
+ */
+function areaSweepDays(segment: Segment, segments: SegmentCollection): [string, string] | null {
+  const [col, row] = cellOf(segment, segments, AREA_GRID).split(',').map(Number);
+  if ((col + row) % 2 !== 0) return null;
+  const area = Math.floor((row * AREA_GRID + col) / 2); // 0 to 7 over the eight checkerboard cells
+  return [DAY_NAMES[area % 5], DAY_NAMES[(area + 1) % 5]];
+}
+
+/** One sweeping row per side, each with a single-day window; a few blocks start at 08:30 to test the hourly rule. */
+function dayByDaySweepingRows(segment_id: string, sides: [Side, Side], days: [string, string], rng: Rng): RuleRow[] {
+  const half = chance(0.15, rng);
+  const start = half ? '08:30' : pick(['08:00', '09:00', '10:00'], rng);
+  const end = half ? '10:30' : String(Number(start.slice(0, 2)) + 2).padStart(2, '0') + ':00';
+  return sides.map((side, i) => ({
+    segment_id, side, layer: 'sweeping' as const, type: null, limit_minutes: null, permit_code: null, color_key: null,
+    schedule: win([days[i]], start, end),
+  }));
+}
+
 function timedSchedule(rng: Rng): Schedule {
   const r = rng();
   if (r < 0.1) return null;
@@ -170,7 +195,12 @@ export function generateSampleRows(segments: SegmentCollection, seed: number): R
     const sides = sidesOf(segment);
     let layers = LAYER_ODDS.filter(([, p]) => chance(p, rng)).map(([layer]) => layer);
     if (layers.length === 0) layers = [pick(LAYER_ODDS, rng)[0]];
-    for (const layer of layers) rows.push(rowFor(layer, id, pick(sides, rng), rng));
+    const sweepDays = areaSweepDays(segment, segments);
+    if (sweepDays && !layers.includes('sweeping')) layers = ['sweeping', ...layers];
+    for (const layer of layers) {
+      if (layer === 'sweeping' && sweepDays) rows.push(...dayByDaySweepingRows(id, sides, sweepDays, rng));
+      else rows.push(rowFor(layer, id, pick(sides, rng), rng));
+    }
   }
   return rows;
 }

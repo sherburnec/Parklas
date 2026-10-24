@@ -97,6 +97,67 @@ describe('generateSampleRows', () => {
   });
 });
 
+type SweepWindow = { days: string[]; start: string; end: string; weeks_of_month?: number[] };
+const windowsOf = (r: RuleRow): SweepWindow[] => (r.schedule === null ? [] : (r.schedule as { windows: SweepWindow[] }).windows);
+
+/** Sweeping rows grouped by segment; segments with a row on each side are the "both sides" streets (TD-4). */
+function bothSidesSweeping(rows: RuleRow[]): Map<string, RuleRow[]> {
+  const bySegment = new Map<string, RuleRow[]>();
+  for (const r of rows.filter((x) => x.layer === 'sweeping')) bySegment.set(r.segment_id, [...(bySegment.get(r.segment_id) ?? []), r]);
+  return new Map([...bySegment].filter(([, rs]) => new Set(rs.map((r) => r.side)).size === 2));
+}
+
+describe('day-by-day sweeping (TD-4)', () => {
+  const rows = generateSampleRows(segments, SEED);
+  const both = bothSidesSweeping(rows);
+
+  it('gives opposite sides of a block different single-day windows, without weeks of month', () => {
+    expect(both.size).toBeGreaterThan(0);
+    for (const rs of both.values()) {
+      expect(rs).toHaveLength(2);
+      const days = rs.map((r) => {
+        const w = windowsOf(r);
+        expect(w).toHaveLength(1);
+        expect(w[0].days).toHaveLength(1);
+        expect(w[0].weeks_of_month).toBeUndefined();
+        return w[0].days[0];
+      });
+      expect(days[0]).not.toBe(days[1]);
+    }
+  });
+
+  it('covers about half of the city, and every weekday has sweeping somewhere', () => {
+    const cells = new Set([...both.keys()].map((id) => cellOf(byId.get(id)!, segments, 4)));
+    expect(cells.size).toBeGreaterThanOrEqual(6);
+    expect(cells.size).toBeLessThanOrEqual(10);
+    const days = new Set(rows.filter((r) => r.layer === 'sweeping').flatMap((r) => windowsOf(r).flatMap((w) => w.days)));
+    expect(days).toEqual(new Set(['mon', 'tue', 'wed', 'thu', 'fri']));
+  });
+
+  it('varies the days by area: each area uses its own pair of days', () => {
+    const perCell = new Map<string, Set<string>>();
+    for (const [id, rs] of both) {
+      const key = cellOf(byId.get(id)!, segments, 4);
+      perCell.set(key, new Set([...(perCell.get(key) ?? []), ...rs.flatMap((r) => windowsOf(r).flatMap((w) => w.days))]));
+    }
+    for (const days of perCell.values()) expect(days.size).toBe(2);
+    expect(new Set([...perCell.values()].map((d) => [...d].sort().join('+'))).size).toBeGreaterThanOrEqual(4);
+  });
+
+  it('includes some windows starting at 08:30, ending at 10:30', () => {
+    const starts = [...both.values()].flat().flatMap((r) => windowsOf(r));
+    const half = starts.filter((w) => w.start === '08:30');
+    expect(half.length).toBeGreaterThan(0);
+    expect(half.every((w) => w.end === '10:30')).toBe(true);
+    expect(half.length).toBeLessThan(starts.length / 2);
+  });
+
+  it('uses both sides of streets running either direction', () => {
+    const sides = new Set([...both.values()].flat().map((r) => r.side));
+    expect(sides).toEqual(new Set(['N', 'S', 'E', 'W']));
+  });
+});
+
 describe('rowsToCsv', () => {
   it('round-trips through the build script parser', () => {
     const rows = generateSampleRows(segments, SEED);
@@ -123,6 +184,16 @@ describe('data/burbank-sample', () => {
     for (const layer of ['sweeping', 'timed_parking', 'restrictions', 'curb_color'] as const) {
       expect(distinctCells(rows, layer, real), layer).toBeGreaterThanOrEqual(4);
     }
+  });
+
+  it('has sweeping on every weekday, with both sides of streets represented and some 08:30 starts', () => {
+    const sweeping = rows.filter((r) => r.layer === 'sweeping');
+    const days = new Set(sweeping.flatMap((r) => windowsOf(r).flatMap((w) => w.days)));
+    expect(days).toEqual(new Set(['mon', 'tue', 'wed', 'thu', 'fri']));
+    const both = bothSidesSweeping(rows);
+    expect(both.size).toBeGreaterThan(0);
+    expect(new Set([...both.values()].flat().map((r) => r.side))).toEqual(new Set(['N', 'S', 'E', 'W']));
+    expect(sweeping.some((r) => windowsOf(r).some((w) => w.start === '08:30'))).toBe(true);
   });
 
   it('leaves more blocks unmapped than mapped', () => {
