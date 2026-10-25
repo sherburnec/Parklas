@@ -17,6 +17,10 @@
     },
     "limit_minutes": { "type": ["integer", "null"], "minimum": 1 },
     "permit_code": { "type": ["string", "null"], "description": "Timed parking permit code, or the permit exception on a restriction." },
+    "permit_mode": {
+      "enum": ["required", "exempt", null],
+      "description": "Only on a no_parking restriction that has a permit_code. required: no parking except by permit, only holders of that zone's permit may park. exempt (or empty): holders of that zone's permit are exempt from the ban."
+    },
     "color_key": { "type": ["string", "null"], "pattern": "^[a-z0-9_]+$", "description": "Key into the city's curb color config." },
     "schedule": { "$ref": "schedule.schema.json" }
   },
@@ -39,6 +43,13 @@
     {
       "if": { "properties": { "layer": { "enum": ["timed_parking", "restrictions"] } } },
       "else": { "properties": { "permit_code": { "type": "null" } } }
+    },
+    {
+      "if": {
+        "properties": { "layer": { "const": "restrictions" }, "type": { "const": "no_parking" }, "permit_code": { "type": "string" } },
+        "required": ["layer", "type", "permit_code"]
+      },
+      "else": { "properties": { "permit_mode": { "type": "null" } } }
     }
   ]
 }

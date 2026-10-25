@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildLayers, sideToOffset, type Line, type Offset, type SegmentCollection } from './build.ts';
+import { buildLayers, parseRuleRows, sideToOffset, type Line, type Offset, type SegmentCollection } from './build.ts';
 
 // Burbank latitude, so a degree of longitude is shorter than a degree of latitude.
 const eastward: Line = [[-118.31, 34.18], [-118.30, 34.18]];
@@ -156,6 +156,24 @@ describe('buildLayers', () => {
         expect(f.geometry.coordinates.length).toBeGreaterThanOrEqual(2);
       }
     }
+  });
+
+  it('carries permit_mode on restriction features', () => {
+    const r = buildLayers(
+      segments(),
+      [row({ layer: 'restrictions', type: 'no_parking', permit_code: 'A', permit_mode: 'required' })] as never,
+      'testville',
+    );
+    expect(r.restrictions.features[0].properties).toMatchObject({ type: 'no_parking', permit_code: 'A', permit_mode: 'required' });
+  });
+
+  it('reads permit_mode from a CSV column, null when the cell or column is missing', () => {
+    const withCol = parseRuleRows(
+      'segment_id,side,layer,type,limit_minutes,permit_code,permit_mode,color_key,schedule\nns-1,L,restrictions,no_parking,,A,required,,\nns-1,R,restrictions,no_parking,,A,,,\n',
+    );
+    expect(withCol.map((r) => r.permit_mode)).toEqual(['required', null]);
+    const without = parseRuleRows('segment_id,side,layer,type,limit_minutes,permit_code,color_key,schedule\nns-1,L,restrictions,no_parking,,A,,\n');
+    expect(without[0].permit_mode).toBeNull();
   });
 
   it('computes the offset from the side alone', () => {

@@ -18,7 +18,7 @@ const SCHEMA_BY_FILE: Record<string, string> = {
   'trim.json': 'trim',
 };
 
-const RULE_COLUMNS = ['segment_id', 'city_id', 'side', 'layer', 'type', 'limit_minutes', 'permit_code', 'color_key', 'schedule'];
+const RULE_COLUMNS = ['segment_id', 'city_id', 'side', 'layer', 'type', 'limit_minutes', 'permit_code', 'permit_mode', 'color_key', 'schedule'];
 const REQUIRED_COLUMNS = ['segment_id', 'side', 'layer'];
 
 // RFC 4180: quoted cells may hold commas, doubled quotes and newlines (schedule cells are JSON text).

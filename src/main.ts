@@ -1,6 +1,6 @@
 import { createBasemap } from './basemap';
 import { bannerText, getDataSet, loadCity } from './data-loader';
-import { drawSweeping, drawTimedParking, drawZoning } from './layers';
+import { drawNoStopping, drawRestrictions, drawSweeping, drawTimedParking, drawZoning } from './layers';
 import type { TimeSelection } from './layers';
 
 const CITY_ID = 'burbank';
@@ -31,6 +31,13 @@ loadCity(CITY_ID)
     );
     void basemap.ready.then(() =>
       drawTimedParking(basemap.map, city.timedParking, city.trim, SELECTED, city.city.time_zone, basemap.underLabelsLayerId, app),
+    );
+    void basemap.ready.then(() =>
+      drawRestrictions(basemap.map, city.restrictions, city.trim, SELECTED, city.city.time_zone, basemap.underLabelsLayerId, app),
+    );
+    // Last, so its bands are drawn above every other band layer.
+    void basemap.ready.then(() =>
+      drawNoStopping(basemap.map, city.restrictions, city.trim, SELECTED, city.city.time_zone, basemap.underLabelsLayerId, app),
     );
   })
   .catch((err: unknown) => {

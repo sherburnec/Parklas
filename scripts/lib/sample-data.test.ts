@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildLayers, parseRuleRows, type RuleRow, type SegmentCollection } from './build.ts';
-import { cellOf, generateSampleRows, isCorner, permitCodeAt, rowsToCsv, SAMPLE_SEED, zoneAt, type PermitZoneCollection } from './sample-data.ts';
+import { cellOf, CURB_COLORS, curbColorsToJson, generateSampleRows, isCorner, permitCodeAt, rowsToCsv, SAMPLE_SEED, zoneAt, type PermitZoneCollection } from './sample-data.ts';
 import { generateZoning } from './sample-zoning.ts';
 
 // A 60 x 60 street grid over Burbank's extent: alternating east-west and north-south blocks.
@@ -174,7 +174,7 @@ describe('timed parking spread (TD-5)', () => {
 
   it('is repeatable and leaves every other layer exactly as before', () => {
     expect(generateSampleRows(real, SAMPLE_SEED, context)).toEqual(rows);
-    const others = (rs: RuleRow[]) => rs.filter((r) => r.layer !== 'timed_parking' && r.layer !== 'restrictions'); // restrictions: see TD-6
+    const others = (rs: RuleRow[]) => rs.filter((r) => r.layer !== 'timed_parking' && r.layer !== 'restrictions' && r.layer !== 'curb_color'); // restrictions: see TD-6, curb_color: see TD-7
     expect(others(rows)).toEqual(others(generateSampleRows(real, SAMPLE_SEED)));
   });
 
@@ -238,7 +238,7 @@ describe('rowsToCsv', () => {
   });
 
   it('starts with the template header', () => {
-    expect(rowsToCsv([]).split('\n')[0]).toBe('segment_id,side,layer,type,limit_minutes,permit_code,color_key,schedule');
+    expect(rowsToCsv([]).split('\n')[0]).toBe('segment_id,side,layer,type,limit_minutes,permit_code,permit_mode,color_key,schedule');
   });
 });
 
@@ -258,7 +258,7 @@ describe('restrictions spread (TD-6)', () => {
   const kindOf = (r: RuleRow) =>
     r.type === 'no_stopping' ? 'no_stopping'
       : r.type === 'no_standing' ? 'no_standing'
-        : r.permit_code !== null ? 'permit_only'
+        : r.permit_mode === 'required' ? 'permit_only'
           : r.schedule !== null ? 'no_parking_timed'
             : 'no_parking_anytime';
   const cellsOf = (kind: string) =>
@@ -278,8 +278,20 @@ describe('restrictions spread (TD-6)', () => {
     }
   });
 
+  it('marks permit-only rows "required", and gives permit_mode to no other kind of row', () => {
+    expect(restrictions.filter((r) => r.permit_mode === 'required').length).toBeGreaterThanOrEqual(10);
+    for (const r of rows) {
+      if (r.permit_mode === null || r.permit_mode === undefined) continue;
+      expect(r.layer, 'layer').toBe('restrictions');
+      expect(r.type, 'type').toBe('no_parking');
+      expect(r.permit_code, 'code').not.toBeNull();
+    }
+    // Rows with a code and no "required" are exempt rows, and they exist too (scheduled and always-on both allowed).
+    expect(restrictions.some((r) => r.permit_code !== null && r.permit_mode !== 'required')).toBe(true);
+  });
+
   it('puts permit-only rows inside DEMO- permit zones with that zone code, in at least 2 zones', () => {
-    const matching = restrictions.filter((r) => r.permit_code !== null && permitCodeAt(byId.get(r.segment_id)!, permitZones) === r.permit_code);
+    const matching = restrictions.filter((r) => r.permit_mode === 'required' &&permitCodeAt(byId.get(r.segment_id)!, permitZones) === r.permit_code);
     expect(matching.length).toBeGreaterThanOrEqual(10);
     expect(new Set(matching.map((r) => r.permit_code)).size).toBeGreaterThanOrEqual(2);
     const added = restrictions.filter((r) => !inBase(r));
@@ -334,6 +346,74 @@ describe('restrictions spread (TD-6)', () => {
   });
 });
 
+// Curb colors spread (task TD-7): the five colors of the sample config, placed across the city, mostly near corners.
+describe('curb colors spread (TD-7)', () => {
+  const data = resolve(import.meta.dirname, '..', '..', 'data');
+  const real = JSON.parse(readFileSync(resolve(data, 'burbank', 'segments.geojson'), 'utf8')) as SegmentCollection;
+  const permitZones = JSON.parse(readFileSync(resolve(data, 'burbank-sample', 'permit-zones.geojson'), 'utf8')) as PermitZoneCollection;
+  const context = { zoning: generateZoning(real, 'burbank-sample'), permitZones };
+  const rows = generateSampleRows(real, SAMPLE_SEED, context);
+  const base = generateSampleRows(real, SAMPLE_SEED);
+  const colored = rows.filter((r) => r.layer === 'curb_color');
+  const byId = new Map(real.features.map((f) => [f.properties.segment_id, f]));
+  const same = (a: RuleRow, b: RuleRow) => JSON.stringify(a) === JSON.stringify(b);
+  const added = colored.filter((r) => !base.some((b) => same(b, r)));
+  const defaultOf = (key: string) => JSON.stringify(CURB_COLORS[key].default_schedule);
+
+  it('defines red, yellow, white, green and blue, each with label, hex, time limit and default schedule', () => {
+    expect(Object.keys(CURB_COLORS).sort()).toEqual(['blue', 'green', 'red', 'white', 'yellow']);
+    for (const c of Object.values(CURB_COLORS)) {
+      expect(c.label.length).toBeGreaterThan(0);
+      expect(c.hex).toMatch(/^#[0-9A-Fa-f]{6}$/);
+      expect(c).toHaveProperty('time_limit_minutes');
+      expect(c).toHaveProperty('default_schedule');
+    }
+  });
+
+  it('is repeatable, keeps every earlier curb color row and leaves other layers alone', () => {
+    expect(generateSampleRows(real, SAMPLE_SEED, context)).toEqual(rows);
+    const old = base.filter((r) => r.layer === 'curb_color');
+    expect(added.length).toBeGreaterThan(0);
+    expect(colored.length).toBe(old.length + added.length);
+    expect(old.every((r) => colored.some((x) => same(x, r)))).toBe(true);
+    // New rows go on the end, so no earlier row moves.
+    expect(rows.slice(rows.length - added.length)).toEqual(added);
+  });
+
+  it('uses only colors from the config, and every color appears in at least 2 separate parts of the city', () => {
+    for (const r of colored) expect(Object.keys(CURB_COLORS), r.segment_id).toContain(r.color_key);
+    for (const key of Object.keys(CURB_COLORS)) {
+      const cells = new Set(colored.filter((r) => r.color_key === key).map((r) => cellOf(byId.get(r.segment_id)!, real, 3)));
+      expect(cells.size, key).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('puts most of the added rows on corner blocks', () => {
+    const corners = added.filter((r) => isCorner(byId.get(r.segment_id)!, real)).length;
+    expect(corners / added.length).toBeGreaterThan(0.7);
+    expect(corners).toBeLessThan(added.length); // a few sit mid-block
+  });
+
+  it('gives a few rows their own schedule that differs from the color default', () => {
+    const own = colored.filter((r) => r.schedule !== null && JSON.stringify(r.schedule) !== defaultOf(r.color_key!));
+    const addedOwn = added.filter((r) => own.includes(r));
+    expect(addedOwn.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(addedOwn.map((r) => r.color_key)).size).toBeGreaterThanOrEqual(2);
+    expect(addedOwn.length).toBeLessThan(added.length / 3); // "a few"
+  });
+
+  it('writes no duplicate (segment, side) curb color rows and keeps unmapped blocks far more common', () => {
+    expect(new Set(colored.map((r) => `${r.segment_id}|${r.side}`)).size).toBe(colored.length);
+    expect(new Set(rows.map((r) => r.segment_id)).size).toBeLessThan(real.features.length / 10);
+  });
+
+  it('writes a config file in the format of curb-colors-config.schema.json', () => {
+    const json = JSON.parse(curbColorsToJson('burbank-sample')) as { city_id: string; colors: Record<string, unknown> };
+    expect(json.city_id).toBe('burbank-sample');
+    expect(json.colors).toEqual(CURB_COLORS);
+  });
+});
+
 // The committed sample set, checked against the TD-2 "Done when" conditions.
 describe('data/burbank-sample', () => {
   const root = resolve(import.meta.dirname, '..', '..', 'data');
@@ -351,6 +431,13 @@ describe('data/burbank-sample', () => {
     for (const layer of ['sweeping', 'timed_parking', 'restrictions', 'curb_color'] as const) {
       expect(distinctCells(rows, layer, real), layer).toBeGreaterThanOrEqual(4);
     }
+  });
+
+  it('writes curb-colors.json exactly as the generator does, and the rows use every color in it', () => {
+    const config = readFileSync(resolve(root, 'burbank-sample', 'curb-colors.json'), 'utf8');
+    expect(config.replace(/\r\n/g, '\n')).toBe(curbColorsToJson('burbank-sample'));
+    const used = new Set(rows.filter((r) => r.layer === 'curb_color').map((r) => r.color_key));
+    expect(used).toEqual(new Set(Object.keys(JSON.parse(config).colors)));
   });
 
   it('has sweeping on every weekday, with both sides of streets represented and some 08:30 starts', () => {

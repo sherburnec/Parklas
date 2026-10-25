@@ -107,6 +107,35 @@ describe('validateCity', () => {
     expect(problems[0].reason).toContain('nope-1');
   });
 
+  it('accepts permit_mode "required" or "exempt" on a no_parking restriction with a permit code', () => {
+    for (const mode of ['required', 'exempt']) {
+      const files = goodCity();
+      files['rules.csv'] = [
+        'segment_id,side,layer,type,limit_minutes,permit_code,permit_mode,color_key,schedule',
+        `seg-1,L,restrictions,no_parking,,A,${mode},,`,
+      ].join('\n');
+      expect(validateCity(files, schemas), mode).toEqual([]);
+    }
+  });
+
+  it('rejects permit_mode without a permit code, on other layers and types, and unknown values', () => {
+    const header = 'segment_id,side,layer,type,limit_minutes,permit_code,permit_mode,color_key,schedule';
+    const bad = [
+      'seg-1,L,restrictions,no_parking,,,required,,',
+      'seg-1,L,restrictions,no_stopping,,A,required,,',
+      'seg-1,L,restrictions,no_parking,,A,maybe,,',
+      'seg-1,L,timed_parking,,60,A,required,,',
+      'seg-1,L,sweeping,,,,required,,',
+    ];
+    for (const line of bad) {
+      const files = goodCity();
+      files['rules.csv'] = [header, line].join('\n');
+      const problems = validateCity(files, schemas);
+      expect(problems.length, line).toBeGreaterThan(0);
+      expect(problems[0], line).toMatchObject({ file: 'rules.csv', row: 2 });
+    }
+  });
+
   it('reports a color_key that is not in the curb color config', () => {
     const files = goodCity();
     files['rules.csv'] += '\nseg-1,R,curb_color,,,,purple,';

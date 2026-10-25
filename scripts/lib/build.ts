@@ -16,6 +16,8 @@ export interface RuleRow {
   type: string | null;
   limit_minutes: number | null;
   permit_code: string | null;
+  /** Restrictions only: `required` means no parking except by permit; empty or `exempt` means the code is an exemption. */
+  permit_mode?: 'required' | 'exempt' | null;
   color_key: string | null;
   schedule: unknown;
 }
@@ -85,7 +87,7 @@ export function buildLayers(segments: SegmentCollection, rows: RuleRow[], cityId
         out.timedParking.features.push(feature({ limit_minutes: r.limit_minutes, permit_code: r.permit_code }));
         break;
       case 'restrictions':
-        out.restrictions.features.push(feature({ type: r.type, permit_code: r.permit_code }));
+        out.restrictions.features.push(feature({ type: r.type, permit_code: r.permit_code, permit_mode: r.permit_mode ?? null }));
         break;
       case 'curb_color':
         out.curbColors.features.push(feature({ color_key: r.color_key }));
@@ -121,6 +123,7 @@ export function parseRuleRows(csv: string): RuleRow[] {
         type: (rec.type as string | null) ?? null,
         limit_minutes: (rec.limit_minutes as number | null) ?? null,
         permit_code: (rec.permit_code as string | null) ?? null,
+        permit_mode: (rec.permit_mode as RuleRow['permit_mode']) ?? null,
         color_key: (rec.color_key as string | null) ?? null,
         schedule: rec.schedule ?? null,
       };

@@ -122,7 +122,7 @@ function dayByDaySweepingRows(segment_id: string, sides: [Side, Side], days: [st
   const start = half ? '08:30' : pick(['08:00', '09:00', '10:00'], rng);
   const end = half ? '10:30' : String(Number(start.slice(0, 2)) + 2).padStart(2, '0') + ':00';
   return sides.map((side, i) => ({
-    segment_id, side, layer: 'sweeping' as const, type: null, limit_minutes: null, permit_code: null, color_key: null,
+    segment_id, side, layer: 'sweeping' as const, type: null, limit_minutes: null, permit_code: null, permit_mode: null, color_key: null,
     schedule: win([days[i]], start, end),
   }));
 }
@@ -148,7 +148,7 @@ function colorSchedule(color: string, rng: Rng): Schedule {
 }
 
 function rowFor(layer: Layer, segment_id: string, side: Side, rng: Rng): RuleRow {
-  const row: RuleRow = { segment_id, side, layer, type: null, limit_minutes: null, permit_code: null, color_key: null, schedule: null };
+  const row: RuleRow = { segment_id, side, layer, type: null, limit_minutes: null, permit_code: null, permit_mode: null, color_key: null, schedule: null };
   switch (layer) {
     case 'sweeping':
       row.schedule = sweepingSchedule(rng);
@@ -330,7 +330,9 @@ function spreadRestrictions(rows: RuleRow[], segments: SegmentCollection, ctx: S
   const added: RuleRow[] = [];
   const add = (segment_id: string, side: Side, type: string, permit_code: string | null, schedule: Schedule) => {
     taken.add(`${segment_id}|${side}`);
-    added.push({ segment_id, side, layer: 'restrictions', type: type as RuleRow['type'], limit_minutes: null, permit_code, color_key: null, schedule });
+    // A permit-only row ("no parking except by permit") is the one that sets permit_mode.
+    const permit_mode = permit_code === null ? null : 'required';
+    added.push({ segment_id, side, layer: 'restrictions', type: type as RuleRow['type'], limit_minutes: null, permit_code, permit_mode, color_key: null, schedule });
   };
   const freeSide = (id: string, preferred?: Side): Side | null => {
     const free = SIDES.filter((s) => !taken.has(`${id}|${s}`));
@@ -397,8 +399,75 @@ function spreadExemptions(rows: RuleRow[], segments: SegmentCollection, ctx: Sam
     if (free.length === 0) continue;
     const side = free.find((s) => timed.has(`${id}|${s}`)) ?? pick(free, rng);
     added.push({
-      segment_id: id, side, layer: 'restrictions', type: 'no_parking', limit_minutes: null, permit_code: permit, color_key: null,
+      segment_id: id, side, layer: 'restrictions', type: 'no_parking', limit_minutes: null, permit_code: permit, permit_mode: 'exempt', color_key: null,
       schedule: win(WEEKDAYS, '07:00', '09:00'),
+    });
+  }
+  return [...rows, ...added];
+}
+
+type CurbColor = { label: string; hex: string; time_limit_minutes: number | null; default_schedule: Schedule };
+
+/** The sample curb color config (task TD-7), written to data/burbank-sample/curb-colors.json. */
+export const CURB_COLORS: Record<string, CurbColor> = {
+  red: { label: 'Red: no stopping', hex: '#D32F2F', time_limit_minutes: null, default_schedule: null },
+  yellow: { label: 'Yellow: loading zone', hex: '#F9C80E', time_limit_minutes: 30, default_schedule: null },
+  green: { label: 'Green: short-term parking', hex: '#2E9E5B', time_limit_minutes: 15, default_schedule: win(WEEKDAYS, '08:00', '18:00') },
+  white: { label: 'White: passenger loading', hex: '#F5F5F5', time_limit_minutes: 5, default_schedule: null },
+  blue: { label: 'Blue: accessible parking', hex: '#1565C0', time_limit_minutes: null, default_schedule: null },
+};
+
+/** One line per color, as the file was first written by hand. */
+export function curbColorsToJson(city_id: string): string {
+  const schedule = (s: Schedule) =>
+    s === null ? 'null' : `{ "windows": [${s.windows.map((w) => `{ "days": ${JSON.stringify(w.days).replace(/,/g, ', ')}, "start": "${w.start}", "end": "${w.end}" }`).join(', ')}] }`;
+  const lines = Object.entries(CURB_COLORS).map(
+    ([key, c]) =>
+      `    ${JSON.stringify(key)}: { "label": ${JSON.stringify(c.label)}, "hex": "${c.hex}", "time_limit_minutes": ${c.time_limit_minutes}, "default_schedule": ${schedule(c.default_schedule)} }`,
+  );
+  return `{\n  "city_id": ${JSON.stringify(city_id)},\n  "colors": {\n${lines.join(',\n')}\n  }\n}\n`;
+}
+
+// Curb colors spread (task TD-7). TD-2 already places red, yellow, green and white at random; this adds blue and more of
+// every color, weighted toward corner blocks, and gives a few rows a schedule of their own that replaces the color's default.
+const COLOR_CYCLE = ['red', 'yellow', 'white', 'green', 'blue']; // cycled in street order, so each color lands in several parts of the city
+const ADD_COLOR_CORNER = [0.4, 0.004]; // [mapped, unmapped] chance for a corner block
+const ADD_COLOR_MIDBLOCK = [0.03, 0.0003];
+const OVERRIDE_EVERY = 6; // every 6th added row; 6 and the 5 colors share no factor, so every color gets one in turn
+const COLOR_OVERRIDES: Record<string, Schedule> = {
+  red: win(WEEKDAYS, '16:00', '18:00'),
+  yellow: win(MON_SAT, '07:00', '15:00'),
+  white: win(WEEKDAYS, '07:00', '09:00'),
+  green: win(['sat', 'sun'], '09:00', '17:00'),
+  blue: win(WEEKDAYS, '08:00', '20:00'),
+};
+
+/**
+ * Adds curb color rows after every other step (they all stay, in place), with its own generator so no row moves.
+ * A side never gets two colors.
+ */
+function spreadCurbColors(rows: RuleRow[], segments: SegmentCollection, seed: number): RuleRow[] {
+  const rng = mulberry32((seed ^ 0x43555242) >>> 0);
+  const taken = new Set<string>();
+  const mapped = new Set<string>();
+  for (const r of rows) {
+    mapped.add(r.segment_id);
+    if (r.layer === 'curb_color') taken.add(`${r.segment_id}|${r.side}`);
+  }
+  const added: RuleRow[] = [];
+  for (const segment of segments.features) {
+    const id = segment.properties.segment_id;
+    const odds = isCorner(segment, segments) ? ADD_COLOR_CORNER : ADD_COLOR_MIDBLOCK;
+    if (!chance(odds[mapped.has(id) ? 0 : 1], rng)) continue;
+    const free = SIDES.filter((s) => !taken.has(`${id}|${s}`));
+    if (free.length === 0) continue;
+    const side = pick(free, rng);
+    const color_key = COLOR_CYCLE[added.length % COLOR_CYCLE.length];
+    const own = added.length % OVERRIDE_EVERY === OVERRIDE_EVERY - 1;
+    taken.add(`${id}|${side}`);
+    added.push({
+      segment_id: id, side, layer: 'curb_color', type: null, limit_minutes: null, permit_code: null, permit_mode: null, color_key,
+      schedule: own ? COLOR_OVERRIDES[color_key] : null,
     });
   }
   return [...rows, ...added];
@@ -422,10 +491,10 @@ export function generateSampleRows(segments: SegmentCollection, seed: number, co
   }
   if (!context) return rows;
   const restricted = spreadRestrictions(spreadTimedParking(alignPermitCodes(rows, segments, context), segments, context, seed), segments, context, seed);
-  return spreadExemptions(restricted, segments, context, seed);
+  return spreadCurbColors(spreadExemptions(restricted, segments, context, seed), segments, seed);
 }
 
-const HEADER = 'segment_id,side,layer,type,limit_minutes,permit_code,color_key,schedule';
+const HEADER = 'segment_id,side,layer,type,limit_minutes,permit_code,permit_mode,color_key,schedule';
 
 const cell = (v: string | number | null): string => {
   if (v === null) return '';
@@ -435,7 +504,7 @@ const cell = (v: string | number | null): string => {
 
 export function rowsToCsv(rows: RuleRow[]): string {
   const lines = rows.map((r) =>
-    [r.segment_id, r.side, r.layer, r.type, r.limit_minutes, r.permit_code, r.color_key, r.schedule === null ? null : JSON.stringify(r.schedule)]
+    [r.segment_id, r.side, r.layer, r.type, r.limit_minutes, r.permit_code, r.permit_mode ?? null, r.color_key, r.schedule === null ? null : JSON.stringify(r.schedule)]
       .map(cell)
       .join(','),
   );

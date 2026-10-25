@@ -71,7 +71,8 @@ One block, two sides (`L` and `R`): each side gets its own row. To tell which is
 | `layer` | `sweeping`, `timed_parking`, `restrictions` or `curb_color`. |
 | `type` | Only for `restrictions`: `no_parking`, `no_standing` or `no_stopping`. Leave empty for the other layers. A `no_stopping` row is what draws the strongest "no stopping, standing or parking" style. |
 | `limit_minutes` | Only for `timed_parking`: the limit in minutes. 2 hours is `120`. Leave empty otherwise. |
-| `permit_code` | Optional, for `timed_parking` and `restrictions`: the permit that is exempt, for example `A`. Leave empty otherwise. |
+| `permit_code` | Optional, for `timed_parking` and `restrictions`: the permit zone the row names, for example `A`. On a timed parking row, holders of that zone's permit are exempt. On a restrictions row, see `permit_mode`. Leave empty otherwise. |
+| `permit_mode` | Only for a `restrictions` row of type `no_parking` that has a `permit_code`. `required` means no parking except by permit: only holders of that zone's permit may park, shown as "Zone A permit required". Empty or `exempt` means the ban applies to everyone except holders, shown as "Zone A permit exempt". Leave empty otherwise. |
 | `color_key` | Only for `curb_color`: a color name from `curb-colors.json`, for example `red`. Leave empty otherwise. |
 | `schedule` | When the rule is in force (step 3). Empty means always. |
 
