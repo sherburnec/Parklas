@@ -3,7 +3,7 @@ import type { SideCollection, TrimData } from '../data-loader';
 import { bandOffsetPx, bandWidthPx, layoutBands } from './bands';
 import type { HiddenBand } from './bands';
 import type { TimeSelection } from './sweeping';
-import { TIMED_PARKING_BAND, timedParkingStyle } from './timed-parking';
+import { TIMED_PARKING_BAND, timedParkingLegend, timedParkingStyle } from './timed-parking';
 
 const SOURCE_ID = 'timed-parking';
 
@@ -30,6 +30,7 @@ export function drawTimedParking(
   at: TimeSelection,
   timeZone: string,
   beforeLayerId: string,
+  legendParent: HTMLElement,
 ): TimedParkingLayer {
   const { drawn, hidden } = layoutBands(parking, trim);
   map.addSource(SOURCE_ID, { type: 'geojson', data: timedParkingStyle(drawn, at, timeZone) });
@@ -54,6 +55,20 @@ export function drawTimedParking(
       );
     }
   }
+  const legend = document.createElement('div');
+  legend.id = 'timed-parking-legend';
+  const title = document.createElement('strong');
+  title.textContent = 'Timed parking';
+  legend.append(title);
+  for (const entry of timedParkingLegend(parking)) {
+    const row = document.createElement('div');
+    const swatch = document.createElement('span');
+    swatch.className = 'swatch';
+    swatch.style.background = entry.hex;
+    row.append(swatch, entry.label);
+    legend.append(row);
+  }
+  legendParent.append(legend);
   return {
     hidden,
     update(next) {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Schedule, SideCollection } from '../data-loader';
 import { bandSlot } from './bands';
-import { FALLBACK_LIMIT_HEX, LIMIT_HEX, TIMED_PARKING_BAND, timedParkingStyle } from './timed-parking';
+import { FALLBACK_LIMIT_HEX, LIMIT_HEX, PERMIT_EXEMPT_HEX, TIMED_PARKING_BAND, timedParkingLegend, timedParkingStyle } from './timed-parking';
 import { SWEEPING_BAND } from './sweeping';
 
 const side = (limit: number | null, schedule: Schedule, offset: 'left' | 'right' = 'left') => ({
@@ -54,6 +54,49 @@ describe('timedParkingStyle: style per limit', () => {
     expect(hexOf(30)).toBe(FALLBACK_LIMIT_HEX);
     expect(hexOf(null)).toBe(FALLBACK_LIMIT_HEX);
     expect(Object.values(LIMIT_HEX)).not.toContain(FALLBACK_LIMIT_HEX);
+  });
+});
+
+describe('timed parking permit label', () => {
+  const withPermit = (limit: number | null, permit: string | null) => {
+    const f = side(limit, null);
+    return { ...f, properties: { ...f.properties, permit_code: permit } };
+  };
+  const labelOf = (limit: number | null, permit: string | null) =>
+    timedParkingStyle(collection(withPermit(limit, permit)), { day: 'mon', hour: 8 }, TZ).features[0].properties.label;
+
+  it('labels a row with a permit_code "Zone X permit exempt"', () => {
+    expect(labelOf(120, 'A')).toBe('2 hour limit, Zone A permit exempt');
+  });
+
+  it('labels a row without a permit_code by its limit alone', () => {
+    expect(labelOf(120, null)).toBe('2 hour limit');
+    expect(labelOf(60, null)).toBe('1 hour limit');
+    expect(labelOf(30, null)).toBe('30 minute limit');
+    expect(labelOf(null, null)).toBe('Timed parking');
+  });
+
+  it('lists the limits, the fallback and each permit zone once in the legend', () => {
+    const rows = collection(withPermit(120, 'B'), withPermit(60, 'B'), withPermit(180, 'A'), withPermit(60, null));
+    const labels = timedParkingLegend(rows).map((e) => e.label);
+    expect(labels).toEqual([
+      '1 hour limit', '2 hour limit', '3 hour limit', '4 hour limit', 'Other limit',
+      'Zone A permit exempt', 'Zone B permit exempt',
+    ]);
+  });
+
+  it('gives limit entries their color and permit entries the permit color', () => {
+    const entries = timedParkingLegend(collection(withPermit(60, 'A')));
+    expect(entries[0].hex).toBe(LIMIT_HEX[60]);
+    expect(entries.at(-1)?.hex).toBe(PERMIT_EXEMPT_HEX);
+  });
+
+  it('colors a permit-exempt band apart from every limit color, whatever its limit', () => {
+    const hexOf = (limit: number | null, permit: string | null) =>
+      timedParkingStyle(collection(withPermit(limit, permit)), { day: 'mon', hour: 8 }, TZ).features[0].properties.hex;
+    for (const limit of [60, 120, 180, 240, 30, null]) expect(hexOf(limit, 'A')).toBe(PERMIT_EXEMPT_HEX);
+    expect(hexOf(120, null)).toBe(LIMIT_HEX[120]);
+    expect([...Object.values(LIMIT_HEX), FALLBACK_LIMIT_HEX]).not.toContain(PERMIT_EXEMPT_HEX);
   });
 });
 

@@ -30,7 +30,7 @@ loadCity(CITY_ID)
       drawSweeping(basemap.map, city.sweeping, city.trim, SELECTED, city.city.time_zone, basemap.underLabelsLayerId),
     );
     void basemap.ready.then(() =>
-      drawTimedParking(basemap.map, city.timedParking, city.trim, SELECTED, city.city.time_zone, basemap.underLabelsLayerId),
+      drawTimedParking(basemap.map, city.timedParking, city.trim, SELECTED, city.city.time_zone, basemap.underLabelsLayerId, app),
     );
   })
   .catch((err: unknown) => {
