@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { instantFor, isActive, nextChange } from './index';
+import { instantFor, isActive, localDayHour, nextChange } from './index';
 import type { Schedule } from './index';
 
 // All instants are written in UTC. Burbank is UTC-8 (PST) until 2026-03-08
@@ -239,5 +239,25 @@ describe('instantFor', () => {
   it('rejects an hour outside 0 to 23', () => {
     expect(() => instantFor('mon', 24)).toThrow();
     expect(() => instantFor('mon', 1.5)).toThrow();
+  });
+});
+
+describe('localDayHour', () => {
+  it('reads the weekday and hour on the city clock, not the device clock', () => {
+    // 2026-01-05 is a Monday. 03:30 UTC is still Sunday 19:30 in Burbank (PST).
+    expect(localDayHour(at('2026-01-05T03:30:00Z'))).toEqual({ weekday: 'sun', hour: 19 });
+    expect(localDayHour(at('2026-01-05T16:00:00Z'))).toEqual({ weekday: 'mon', hour: 8 });
+    expect(localDayHour(at('2026-01-05T16:00:00Z'), 'Asia/Tokyo')).toEqual({ weekday: 'tue', hour: 1 });
+  });
+
+  it('is right on both sides of the spring-forward change (2026-03-08, 02:00 PST becomes 03:00 PDT)', () => {
+    expect(localDayHour(at('2026-03-08T09:59:59Z'))).toEqual({ weekday: 'sun', hour: 1 });
+    expect(localDayHour(at('2026-03-08T10:00:00Z'))).toEqual({ weekday: 'sun', hour: 3 });
+  });
+
+  it('is right on both sides of the fall-back change (2026-11-01, 02:00 PDT becomes 01:00 PST)', () => {
+    expect(localDayHour(at('2026-11-01T08:59:59Z'))).toEqual({ weekday: 'sun', hour: 1 });
+    expect(localDayHour(at('2026-11-01T09:00:00Z'))).toEqual({ weekday: 'sun', hour: 1 });
+    expect(localDayHour(at('2026-11-01T10:00:00Z'))).toEqual({ weekday: 'sun', hour: 2 });
   });
 });

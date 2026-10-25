@@ -25,6 +25,17 @@
       #layer-toggles legend { padding: 0; font-weight: 600; }
       #layer-toggles label { display: block; cursor: pointer; }
       #layer-toggles input { margin: 0 6px 0 0; }
+      #time-controls {
+        position: absolute; left: 50%; top: 10px; z-index: 1; transform: translateX(-50%);
+        width: min(440px, calc(100% - 20px)); box-sizing: border-box; padding: 8px 10px;
+        font: 12px system-ui, sans-serif; background: rgba(255, 255, 255, 0.95); border-radius: 4px;
+      }
+      #time-controls .time-readout { display: block; margin-bottom: 6px; font: 600 18px system-ui, sans-serif; }
+      #time-controls .day-picker { display: flex; gap: 2px; margin-bottom: 6px; }
+      #time-controls .day-picker button { flex: 1; padding: 4px 0; }
+      #time-controls button[aria-pressed="true"] { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+      #time-controls .time-row { display: flex; align-items: center; gap: 8px; }
+      #time-controls .time-row input[type="range"] { flex: 1; min-width: 0; }
       #permit-zones-legend {
         position: absolute; left: 10px; top: 190px; z-index: 1; padding: 6px 10px;
         font: 12px system-ui, sans-serif; background: rgba(255, 255, 255, 0.92); border-radius: 4px;

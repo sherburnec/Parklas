@@ -169,6 +169,12 @@ export function nextChange(
   return null;
 }
 
+/** The weekday and whole hour (0 to 23) on the city clock at this instant, whatever the device's time zone. */
+export function localDayHour(instant: Date, timeZone: string = DEFAULT_TIME_ZONE): { weekday: Weekday; hour: number } {
+  const { local } = wallClock(instant, timeZone);
+  return { weekday: local.weekday, hour: Math.floor(local.minutes / 60) };
+}
+
 /** Sunday first, to match WEEKDAYS. January has no DST change, so every hour exists once. */
 const REFERENCE_SUNDAY = { year: 2026, month: 1, day: 4 };
 

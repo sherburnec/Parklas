@@ -2,7 +2,7 @@ import { createBasemap } from './basemap';
 import { bannerText, getDataSet, loadCity } from './data-loader';
 import { drawCurbColors, drawNoStopping, drawPermitZones, drawRestrictions, drawSweeping, drawTimedParking, drawZoning } from './layers';
 import type { TimeSelection } from './layers';
-import { LAYER_KEYS, createLayerToggles, createUrlState } from './time-ui';
+import { LAYER_KEYS, createLayerToggles, createTimeControls, createUrlState } from './time-ui';
 import type { AppState, LayerKey } from './time-ui';
 
 const CITY_ID = 'burbank';
@@ -28,6 +28,7 @@ loadCity(CITY_ID)
     const basemap = createBasemap(app, city.segments, city.coverage.segment_ids);
     await basemap.ready;
     const zone = city.city.time_zone;
+    createTimeControls(app, state, zone);
     const initial = state.get();
     const toggles: Partial<Record<LayerKey, (visible: boolean) => void>> = {};
     const timeUpdates: Array<(at: TimeSelection) => void> = [];
