@@ -1,0 +1,84 @@
+import { describe, expect, it, vi } from 'vitest';
+import { DEFAULT_STATE, LAYER_KEYS, createAppState, parseSearch, toSearch } from './state';
+
+describe('parseSearch', () => {
+  it('falls back to the defaults for an empty query', () => {
+    expect(parseSearch('')).toEqual(DEFAULT_STATE);
+  });
+
+  it('reads day, hour and hidden layers', () => {
+    const s = parseSearch('?day=fri&hour=17&hide=zoning,sweeping');
+    expect(s.day).toBe('fri');
+    expect(s.hour).toBe(17);
+    expect(s.visible.zoning).toBe(false);
+    expect(s.visible.sweeping).toBe(false);
+    expect(s.visible.timed_parking).toBe(true);
+  });
+
+  it('ignores bad values instead of failing', () => {
+    const s = parseSearch('?day=funday&hour=25&hide=nope,zoning');
+    expect(s.day).toBe(DEFAULT_STATE.day);
+    expect(s.hour).toBe(DEFAULT_STATE.hour);
+    expect(s.visible.zoning).toBe(false);
+    expect(parseSearch('?hour=7.5').hour).toBe(DEFAULT_STATE.hour);
+    expect(parseSearch('?hour=').hour).toBe(DEFAULT_STATE.hour);
+  });
+});
+
+describe('toSearch', () => {
+  it('round-trips every state', () => {
+    const state = createAppState().get();
+    const changed = { ...state, day: 'sun' as const, hour: 0, visible: { ...state.visible, curb_colors: false, permit_zones: false } };
+    expect(parseSearch(toSearch(changed, ''))).toEqual(changed);
+  });
+
+  it('omits hide when every layer is on, and keeps unrelated parameters', () => {
+    const search = toSearch(DEFAULT_STATE, '?foo=bar&hide=zoning&day=tue');
+    const params = new URLSearchParams(search);
+    expect(params.get('foo')).toBe('bar');
+    expect(params.has('hide')).toBe(false);
+    expect(params.get('day')).toBe(DEFAULT_STATE.day);
+  });
+});
+
+describe('createAppState', () => {
+  it('starts from the given search', () => {
+    expect(createAppState('?day=wed&hour=3').get()).toMatchObject({ day: 'wed', hour: 3 });
+  });
+
+  it('tells every subscriber once per change, and not for a no-op', () => {
+    const state = createAppState('');
+    const a = vi.fn();
+    const b = vi.fn();
+    state.subscribe(a);
+    state.subscribe(b);
+    state.set({ day: 'sat', hour: 22 });
+    state.set({ day: 'sat', hour: 22 });
+    expect(a).toHaveBeenCalledTimes(1);
+    expect(b).toHaveBeenCalledTimes(1);
+    expect(a.mock.calls[0][0]).toMatchObject({ day: 'sat', hour: 22 });
+  });
+
+  it('toggles one layer without touching the others', () => {
+    const state = createAppState('');
+    state.setLayerVisible('sweeping', false);
+    const { visible } = state.get();
+    expect(visible.sweeping).toBe(false);
+    expect(LAYER_KEYS.filter((k) => k !== 'sweeping').every((k) => visible[k])).toBe(true);
+  });
+
+  it('rejects an hour that is not a whole number 0 to 23', () => {
+    const state = createAppState('');
+    expect(() => state.set({ hour: 24 })).toThrow();
+    expect(() => state.set({ hour: 1.5 })).toThrow();
+  });
+
+  it('stops notifying after unsubscribe', () => {
+    const state = createAppState('');
+    const fn = vi.fn();
+    const off = state.subscribe(fn);
+    off();
+    state.set({ hour: 1 });
+    expect(fn).not.toHaveBeenCalled();
+  });
+});

@@ -19,6 +19,7 @@ export type { CurbColorsLayer } from './draw-curb-colors';
 export { UNKNOWN_COLOR_HEX, curbColorLegend, curbColorStyle } from './curb-colors';
 export type { CurbColorLegendEntry } from './curb-colors';
 export { drawZoning } from './draw-zoning';
+export type { ZoningLayer } from './draw-zoning';
 export { drawPermitZones } from './draw-permit-zones';
 export type { PermitZonesLayer } from './draw-permit-zones';
 export { PERMIT_ZONE_HEXES, permitZoneLegend, permitZoneStyle } from './permit-zones';

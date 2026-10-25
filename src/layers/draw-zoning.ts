@@ -5,6 +5,11 @@ import { zoningLegend, zoningStyle } from './zoning';
 const SOURCE_ID = 'zoning';
 const LAYER_ID = 'zoning-fill';
 
+export interface ZoningLayer {
+  /** Show or hide the polygons and the legend together. */
+  setVisible(visible: boolean): void;
+}
+
 /**
  * Draws zoning polygons on the map, under the layer `beforeLayerId`, and puts a legend
  * with one entry per category in `legendParent`.
@@ -15,7 +20,7 @@ export function drawZoning(
   config: ZoningCategoriesConfig,
   beforeLayerId: string,
   legendParent: HTMLElement,
-): void {
+): ZoningLayer {
   map.addSource(SOURCE_ID, { type: 'geojson', data: zoningStyle(zoning, config) });
   map.addLayer(
     {
@@ -41,4 +46,10 @@ export function drawZoning(
     legend.append(row);
   }
   legendParent.append(legend);
+  return {
+    setVisible(visible) {
+      map.setLayoutProperty(LAYER_ID, 'visibility', visible ? 'visible' : 'none');
+      legend.hidden = !visible;
+    },
+  };
 }

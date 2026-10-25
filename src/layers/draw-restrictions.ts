@@ -17,6 +17,8 @@ const LABEL_SIZE_PX = 10;
 export interface RestrictionsLayer {
   /** Restyle every side for a new day and hour. */
   update(at: TimeSelection): void;
+  /** Show or hide the whole layer, permit labels and legend included. */
+  setVisible(visible: boolean): void;
   /** Sides and slivers left off the map by the band flags. Their rows stay in the data for the click-through list. */
   hidden: HiddenBand[];
 }
@@ -38,13 +40,16 @@ export function drawRestrictions(
   // Only no parking rows are drawn here, so the band layout (inner sides, slivers) counts only those rows.
   const { drawn, hidden } = layoutBands(restrictionRows(restrictions, ['no_parking']), trim);
   map.addSource(SOURCE_ID, { type: 'geojson', data: restrictionsStyle(drawn, at, timeZone) });
+  const layerIds: string[] = [];
   // Inactive first so active bands are never hidden under them.
   for (const active of [false, true]) {
     for (const sgn of [1, -1] as const) {
       const side = sgn > 0 ? '-right' : '-left';
+      const id = `restrictions-${active ? 'active' : 'inactive'}${side}`;
+      layerIds.push(id);
       map.addLayer(
         {
-          id: `restrictions-${active ? 'active' : 'inactive'}${side}`,
+          id,
           type: 'line',
           source: SOURCE_ID,
           filter: ['all', ['==', ['get', 'active'], active], ['==', ['get', 'sgn'], sgn]],
@@ -62,9 +67,11 @@ export function drawRestrictions(
   }
   // Permit text, only on rows that have one. Placed beside the band, on the side it is drawn.
   for (const sgn of [1, -1] as const) {
+    const id = `restrictions-permit-label${sgn > 0 ? '-right' : '-left'}`;
+    layerIds.push(id);
     map.addLayer(
       {
-        id: `restrictions-permit-label${sgn > 0 ? '-right' : '-left'}`,
+        id,
         type: 'symbol',
         source: SOURCE_ID,
         minzoom: 16.5,
@@ -105,6 +112,10 @@ export function drawRestrictions(
     hidden,
     update(next) {
       (map.getSource(SOURCE_ID) as GeoJSONSource).setData(restrictionsStyle(drawn, next, timeZone));
+    },
+    setVisible(visible) {
+      for (const id of layerIds) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
+      legend.hidden = !visible;
     },
   };
 }

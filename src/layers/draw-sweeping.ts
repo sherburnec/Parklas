@@ -17,6 +17,8 @@ const zoomScaled = (px: number): ExpressionSpecification => [
 export interface SweepingLayer {
   /** Restyle every side for a new day and hour. */
   update(at: TimeSelection): void;
+  /** Show or hide the whole layer. */
+  setVisible(visible: boolean): void;
   /** Sides and slivers left off the map by the band flags. Their rows stay in the data for the click-through list. */
   hidden: HiddenBand[];
 }
@@ -36,12 +38,15 @@ export function drawSweeping(
 ): SweepingLayer {
   const { drawn, hidden } = layoutBands(sweeping, trim);
   map.addSource(SOURCE_ID, { type: 'geojson', data: sweepingStyle(drawn, at, timeZone) });
+  const layerIds: string[] = [];
   // Inactive first so active bands are never hidden under them.
   for (const active of [false, true]) {
     for (const sgn of [1, -1] as const) {
+      const id = `sweeping-${active ? 'active' : 'inactive'}${sgn > 0 ? '-right' : '-left'}`;
+      layerIds.push(id);
       map.addLayer(
         {
-          id: `sweeping-${active ? 'active' : 'inactive'}${sgn > 0 ? '-right' : '-left'}`,
+          id,
           type: 'line',
           source: SOURCE_ID,
           filter: ['all', ['==', ['get', 'active'], active], ['==', ['get', 'sgn'], sgn]],
@@ -61,6 +66,9 @@ export function drawSweeping(
     hidden,
     update(next) {
       (map.getSource(SOURCE_ID) as GeoJSONSource).setData(sweepingStyle(drawn, next, timeZone));
+    },
+    setVisible(visible) {
+      for (const id of layerIds) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
     },
   };
 }

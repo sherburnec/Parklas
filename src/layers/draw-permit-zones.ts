@@ -6,14 +6,14 @@ const SOURCE_ID = 'permit-zones';
 const LAYER_IDS = ['permit-zones-fill', 'permit-zones-outline', 'permit-zones-label'];
 
 export interface PermitZonesLayer {
-  /** Show or hide the zones, their codes and the legend together (the permit overview). */
+  /** Show or hide the zones, their codes and the legend together (the permit overview). Starts shown. */
   setVisible(visible: boolean): void;
 }
 
 /**
  * Draws the permit zones as a translucent fill, an outline and a label with the permit code, all under the layer
- * `beforeLayerId` (the street lines), so every curb band draws on top. Adds a toggle button and a legend of the
- * codes to `controlParent`. The overview starts on.
+ * `beforeLayerId` (the street lines), so every curb band draws on top. Adds a legend of the
+ * codes to `controlParent`. The toggle lives in time-ui.
  */
 export function drawPermitZones(
   map: MapLibreMap,
@@ -57,13 +57,6 @@ export function drawPermitZones(
     beforeLayerId,
   );
 
-  const panel = document.createElement('div');
-  panel.id = 'permit-overview';
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.textContent = 'Permit overview';
-  panel.append(button);
-
   const legend = document.createElement('div');
   legend.id = 'permit-zones-legend';
   const title = document.createElement('strong');
@@ -77,19 +70,12 @@ export function drawPermitZones(
     row.append(swatch, entry.code);
     legend.append(row);
   }
-  panel.append(legend);
-  controlParent.append(panel);
+  controlParent.append(legend);
 
-  const setVisible = (visible: boolean): void => {
-    for (const id of LAYER_IDS) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
-    legend.hidden = !visible;
-    button.setAttribute('aria-pressed', String(visible));
+  return {
+    setVisible(visible) {
+      for (const id of LAYER_IDS) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
+      legend.hidden = !visible;
+    },
   };
-  let visible = true;
-  button.addEventListener('click', () => {
-    visible = !visible;
-    setVisible(visible);
-  });
-  setVisible(true);
-  return { setVisible };
 }

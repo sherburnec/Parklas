@@ -18,13 +18,17 @@
         font: 12px system-ui, sans-serif; background: rgba(255, 255, 255, 0.92); border-radius: 4px;
       }
       #timed-parking-legend { left: auto; right: 10px; }
-      #permit-overview {
-        position: absolute; left: 10px; top: 10px; z-index: 1; padding: 6px 10px;
+      #layer-toggles {
+        position: absolute; left: 10px; top: 10px; z-index: 1; margin: 0; padding: 6px 10px;
+        font: 12px system-ui, sans-serif; background: rgba(255, 255, 255, 0.92); border: 0; border-radius: 4px;
+      }
+      #layer-toggles legend { padding: 0; font-weight: 600; }
+      #layer-toggles label { display: block; cursor: pointer; }
+      #layer-toggles input { margin: 0 6px 0 0; }
+      #permit-zones-legend {
+        position: absolute; left: 10px; top: 190px; z-index: 1; padding: 6px 10px;
         font: 12px system-ui, sans-serif; background: rgba(255, 255, 255, 0.92); border-radius: 4px;
       }
-      #permit-overview button { font: inherit; padding: 4px 8px; cursor: pointer; }
-      #permit-overview button[aria-pressed="true"] { font-weight: 600; background: #dde6ff; }
-      #permit-zones-legend { margin-top: 6px; }
       #permit-zones-legend .swatch {
         display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -2px;
         border: 1px solid rgba(0, 0, 0, 0.3);
