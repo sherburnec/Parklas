@@ -4,6 +4,7 @@ import { bandOffsetPx, bandWidthPx, layoutBands } from './bands';
 import type { HiddenBand } from './bands';
 import { RESTRICTIONS_BAND, restrictionRows, restrictionsLegend, restrictionsStyle } from './restrictions';
 import type { TimeSelection } from './sweeping';
+import { filterByZone } from './zone-filter';
 
 const SOURCE_ID = 'restrictions';
 
@@ -39,7 +40,7 @@ export function drawRestrictions(
 ): RestrictionsLayer {
   // Only no parking rows are drawn here, so the band layout (inner sides, slivers) counts only those rows.
   const { drawn, hidden } = layoutBands(restrictionRows(restrictions, ['no_parking']), trim);
-  map.addSource(SOURCE_ID, { type: 'geojson', data: restrictionsStyle(drawn, at, timeZone) });
+  map.addSource(SOURCE_ID, { type: 'geojson', data: restrictionsStyle(filterByZone(drawn, at.zone), at, timeZone) });
   const layerIds: string[] = [];
   // Inactive first so active bands are never hidden under them.
   for (const active of [false, true]) {
@@ -111,7 +112,7 @@ export function drawRestrictions(
   return {
     hidden,
     update(next) {
-      (map.getSource(SOURCE_ID) as GeoJSONSource).setData(restrictionsStyle(drawn, next, timeZone));
+      (map.getSource(SOURCE_ID) as GeoJSONSource).setData(restrictionsStyle(filterByZone(drawn, next.zone), next, timeZone));
     },
     setVisible(visible) {
       for (const id of layerIds) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');

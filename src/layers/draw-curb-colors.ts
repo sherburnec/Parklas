@@ -4,6 +4,7 @@ import { bandOffsetPx, bandWidthPx, layoutBands } from './bands';
 import type { HiddenBand } from './bands';
 import { CURB_COLOR_BAND, curbColorLegend, curbColorStyle } from './curb-colors';
 import type { TimeSelection } from './sweeping';
+import { filterByZone } from './zone-filter';
 
 const SOURCE_ID = 'curb-colors';
 
@@ -36,7 +37,7 @@ export function drawCurbColors(
   legendParent: HTMLElement,
 ): CurbColorsLayer {
   const { drawn, hidden } = layoutBands(curbColors, trim);
-  map.addSource(SOURCE_ID, { type: 'geojson', data: curbColorStyle(drawn, config, at, timeZone) });
+  map.addSource(SOURCE_ID, { type: 'geojson', data: curbColorStyle(filterByZone(drawn, at.zone), config, at, timeZone) });
   const layerIds: string[] = [];
   // Inactive first so active bands are never hidden under them.
   for (const active of [false, true]) {
@@ -78,7 +79,7 @@ export function drawCurbColors(
   return {
     hidden,
     update(next) {
-      (map.getSource(SOURCE_ID) as GeoJSONSource).setData(curbColorStyle(drawn, config, next, timeZone));
+      (map.getSource(SOURCE_ID) as GeoJSONSource).setData(curbColorStyle(filterByZone(drawn, next.zone), config, next, timeZone));
     },
     setVisible(visible) {
       for (const id of layerIds) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');

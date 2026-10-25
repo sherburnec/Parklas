@@ -3,6 +3,7 @@ import type { SideCollection, TrimData } from '../data-loader';
 import { bandOffsetPx, bandWidthPx, layoutBands } from './bands';
 import type { HiddenBand } from './bands';
 import { SWEEPING_BAND, sweepingStyle } from './sweeping';
+import { filterByZone } from './zone-filter';
 import type { TimeSelection } from './sweeping';
 
 const SOURCE_ID = 'sweeping';
@@ -37,7 +38,7 @@ export function drawSweeping(
   beforeLayerId: string,
 ): SweepingLayer {
   const { drawn, hidden } = layoutBands(sweeping, trim);
-  map.addSource(SOURCE_ID, { type: 'geojson', data: sweepingStyle(drawn, at, timeZone) });
+  map.addSource(SOURCE_ID, { type: 'geojson', data: sweepingStyle(filterByZone(drawn, at.zone), at, timeZone) });
   const layerIds: string[] = [];
   // Inactive first so active bands are never hidden under them.
   for (const active of [false, true]) {
@@ -65,7 +66,7 @@ export function drawSweeping(
   return {
     hidden,
     update(next) {
-      (map.getSource(SOURCE_ID) as GeoJSONSource).setData(sweepingStyle(drawn, next, timeZone));
+      (map.getSource(SOURCE_ID) as GeoJSONSource).setData(sweepingStyle(filterByZone(drawn, next.zone), next, timeZone));
     },
     setVisible(visible) {
       for (const id of layerIds) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');

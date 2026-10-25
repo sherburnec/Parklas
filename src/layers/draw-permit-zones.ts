@@ -8,6 +8,8 @@ const LAYER_IDS = ['permit-zones-fill', 'permit-zones-outline', 'permit-zones-la
 export interface PermitZonesLayer {
   /** Show or hide the zones, their codes and the legend together (the permit overview). Starts shown. */
   setVisible(visible: boolean): void;
+  /** Highlight the zone with this permit code (M4-5), or none with null. Works whether or not the zones are shown. */
+  highlight(code: string | null): void;
 }
 
 /**
@@ -57,6 +59,31 @@ export function drawPermitZones(
     beforeLayerId,
   );
 
+  // The chosen zone: a stronger fill and a thick outline, added after the others so they draw on top.
+  const selectedIds = ['permit-zones-selected-fill', 'permit-zones-selected-outline'];
+  const matches = (code: string | null): ['==', ['get', string], string] => ['==', ['get', 'permit_code'], code ?? ''];
+  map.addLayer(
+    {
+      id: selectedIds[0],
+      type: 'fill',
+      source: SOURCE_ID,
+      filter: matches(null),
+      paint: { 'fill-color': ['get', 'hex'], 'fill-opacity': 0.4 },
+    },
+    beforeLayerId,
+  );
+  map.addLayer(
+    {
+      id: selectedIds[1],
+      type: 'line',
+      source: SOURCE_ID,
+      filter: matches(null),
+      layout: { 'line-join': 'round' },
+      paint: { 'line-color': ['get', 'hex'], 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4, 17, 8] },
+    },
+    beforeLayerId,
+  );
+
   const legend = document.createElement('div');
   legend.id = 'permit-zones-legend';
   const title = document.createElement('strong');
@@ -76,6 +103,9 @@ export function drawPermitZones(
     setVisible(visible) {
       for (const id of LAYER_IDS) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
       legend.hidden = !visible;
+    },
+    highlight(code) {
+      for (const id of selectedIds) map.setFilter(id, matches(code));
     },
   };
 }

@@ -1,9 +1,11 @@
 import { createBasemap, UNMAPPED_MESSAGE } from './basemap';
 import { createCurbDetail, createDayZones } from './curb-detail';
 import { bannerText, getDataSet, loadCity } from './data-loader';
-import { drawCurbColors, drawNoStopping, drawPermitZones, drawRestrictions, drawSweeping, drawTimedParking, drawZoning } from './layers';
+import {
+  drawCurbColors, drawNoStopping, drawPermitZones, drawRestrictions, drawSweeping, drawTimedParking, drawZoning, permitZoneLegend,
+} from './layers';
 import type { TimeSelection } from './layers';
-import { LAYER_KEYS, createLayerToggles, createTimeControls, createUrlState } from './time-ui';
+import { LAYER_KEYS, ZONE_ALL, ZONE_NONE, createLayerToggles, createTimeControls, createUrlState, createZoneFilter } from './time-ui';
 import type { AppState, LayerKey } from './time-ui';
 
 const CITY_ID = 'burbank';
@@ -30,7 +32,6 @@ loadCity(CITY_ID)
     await basemap.ready;
     const zone = city.city.time_zone;
     createTimeControls(app, state, zone);
-    const initial = state.get();
     const toggles: Partial<Record<LayerKey, (visible: boolean) => void>> = {};
     const timeUpdates: Array<(at: TimeSelection) => void> = [];
 
@@ -38,10 +39,19 @@ loadCity(CITY_ID)
     if (zoning && zoningCategories) {
       toggles.zoning = drawZoning(basemap.map, zoning, zoningCategories, basemap.underStreetsLayerId, app).setVisible;
     }
+    let highlightZone: (code: string | null) => void = () => {};
     if (permitZones) {
       // After zoning, so the permit zones sit above it; both stay under the street lines and every band.
-      toggles.permit_zones = drawPermitZones(basemap.map, permitZones, basemap.underStreetsLayerId, app).setVisible;
+      const zones = drawPermitZones(basemap.map, permitZones, basemap.underStreetsLayerId, app);
+      toggles.permit_zones = zones.setVisible;
+      highlightZone = zones.highlight;
+      // Zone filter (M4-5): the selector lists the codes in the permit zones file.
+      createZoneFilter(app, state, permitZoneLegend(permitZones).map((e) => e.code));
+    } else if (state.get().zone !== ZONE_ALL) {
+      state.set({ zone: ZONE_ALL }); // no zones to filter by, so a zone in the URL cannot apply
     }
+    // Read after the zone selector has reset any stale zone in the URL.
+    const initial = state.get();
     const sweeping = drawSweeping(basemap.map, city.sweeping, city.trim, initial, zone, basemap.underLabelsLayerId);
     toggles.sweeping = sweeping.setVisible;
     timeUpdates.push(sweeping.update);
@@ -78,8 +88,11 @@ loadCity(CITY_ID)
     // Every layer reads the one state: a change to it restyles them all.
     let shown: AppState = initial;
     const apply = (next: AppState, force: boolean): void => {
-      if (force || next.day !== shown.day || next.hour !== shown.hour) {
-        for (const update of timeUpdates) update({ day: next.day, hour: next.hour });
+      if (force || next.day !== shown.day || next.hour !== shown.hour || next.zone !== shown.zone) {
+        for (const update of timeUpdates) update({ day: next.day, hour: next.hour, zone: next.zone });
+      }
+      if (force || next.zone !== shown.zone) {
+        highlightZone(next.zone === ZONE_ALL || next.zone === ZONE_NONE ? null : next.zone);
       }
       for (const key of LAYER_KEYS) {
         if (force || next.visible[key] !== shown.visible[key]) toggles[key]?.(next.visible[key]);

@@ -7,6 +7,7 @@ import {
 } from './no-stopping';
 import { restrictionRows } from './restrictions';
 import type { TimeSelection } from './sweeping';
+import { filterByZone } from './zone-filter';
 
 const SOURCE_ID = 'no-stopping';
 
@@ -39,7 +40,7 @@ export function drawNoStopping(
   legendParent: HTMLElement,
 ): NoStoppingLayer {
   const { drawn, hidden } = layoutBands(restrictionRows(restrictions, ['no_stopping', 'no_standing']), trim);
-  map.addSource(SOURCE_ID, { type: 'geojson', data: noStoppingStyle(drawn, at, timeZone) });
+  map.addSource(SOURCE_ID, { type: 'geojson', data: noStoppingStyle(filterByZone(drawn, at.zone), at, timeZone) });
   const layerIds: string[] = [];
   // Inactive first so active bands are never hidden under them. Dashed is its own layer: line-dasharray is not data-driven.
   for (const active of [false, true]) {
@@ -86,7 +87,7 @@ export function drawNoStopping(
   return {
     hidden,
     update(next) {
-      (map.getSource(SOURCE_ID) as GeoJSONSource).setData(noStoppingStyle(drawn, next, timeZone));
+      (map.getSource(SOURCE_ID) as GeoJSONSource).setData(noStoppingStyle(filterByZone(drawn, next.zone), next, timeZone));
     },
     setVisible(visible) {
       for (const id of layerIds) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');

@@ -4,6 +4,7 @@ import { bandOffsetPx, bandWidthPx, layoutBands } from './bands';
 import type { HiddenBand } from './bands';
 import type { TimeSelection } from './sweeping';
 import { TIMED_PARKING_BAND, timedParkingLegend, timedParkingStyle } from './timed-parking';
+import { filterByZone } from './zone-filter';
 
 const SOURCE_ID = 'timed-parking';
 
@@ -35,7 +36,7 @@ export function drawTimedParking(
   legendParent: HTMLElement,
 ): TimedParkingLayer {
   const { drawn, hidden } = layoutBands(parking, trim);
-  map.addSource(SOURCE_ID, { type: 'geojson', data: timedParkingStyle(drawn, at, timeZone) });
+  map.addSource(SOURCE_ID, { type: 'geojson', data: timedParkingStyle(filterByZone(drawn, at.zone), at, timeZone) });
   const layerIds: string[] = [];
   // Inactive first so active bands are never hidden under them.
   for (const active of [false, true]) {
@@ -77,7 +78,7 @@ export function drawTimedParking(
   return {
     hidden,
     update(next) {
-      (map.getSource(SOURCE_ID) as GeoJSONSource).setData(timedParkingStyle(drawn, next, timeZone));
+      (map.getSource(SOURCE_ID) as GeoJSONSource).setData(timedParkingStyle(filterByZone(drawn, next.zone), next, timeZone));
     },
     setVisible(visible) {
       for (const id of layerIds) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');

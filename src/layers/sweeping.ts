@@ -8,6 +8,8 @@ import { bandSlot } from './bands';
 export interface TimeSelection {
   day: Weekday;
   hour: number;
+  /** Zone filter (M4-5): 'all' or absent, 'none', or a permit code. Layers draw only the sides it allows. */
+  zone?: string;
 }
 
 /** Sweeping is the first rule layer, so it takes the band nearest the street. */

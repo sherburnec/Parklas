@@ -25,6 +25,34 @@ describe('parseSearch', () => {
   });
 });
 
+describe('zone filter in the URL', () => {
+  it('defaults to all and reads a code or none', () => {
+    expect(parseSearch('').zone).toBe('all');
+    expect(parseSearch('?zone=DEMO-C').zone).toBe('DEMO-C');
+    expect(parseSearch('?zone=none').zone).toBe('none');
+    expect(parseSearch('?zone=').zone).toBe('all');
+  });
+
+  it('round-trips a chosen zone, and leaves zone out when it is all', () => {
+    const base = createAppState().get();
+    for (const zone of ['C', 'none']) {
+      expect(parseSearch(toSearch({ ...base, zone }, '')).zone).toBe(zone);
+    }
+    expect(new URLSearchParams(toSearch(base, '?zone=C')).has('zone')).toBe(false);
+  });
+
+  it('is changed through set, notifies once, and ignores a repeat', () => {
+    const state = createAppState('');
+    const fn = vi.fn();
+    state.subscribe(fn);
+    state.set({ zone: 'B' });
+    state.set({ zone: 'B' });
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(state.get().zone).toBe('B');
+    expect(() => state.set({ zone: '' })).toThrow();
+  });
+});
+
 describe('toSearch', () => {
   it('round-trips every state', () => {
     const state = createAppState().get();

@@ -18,16 +18,23 @@ export const LAYER_LABELS: Record<LayerKey, string> = {
   curb_colors: 'Curb colors',
 };
 
-/** The chosen day and hour (a whole number 0 to 23) and which layers are shown. */
+/** Zone filter values besides a permit code: every side, or only sides outside every permit zone. */
+export const ZONE_ALL = 'all';
+export const ZONE_NONE = 'none';
+
+/** The chosen day and hour (a whole number 0 to 23), which layers are shown, and the zone filter. */
 export interface AppState {
   day: Weekday;
   hour: number;
   visible: Record<LayerKey, boolean>;
+  /** ZONE_ALL, ZONE_NONE or a permit code. */
+  zone: string;
 }
 
 export const DEFAULT_STATE: AppState = {
   day: 'mon',
   hour: 8,
+  zone: ZONE_ALL,
   visible: Object.fromEntries(LAYER_KEYS.map((k) => [k, true])) as Record<LayerKey, boolean>,
 };
 
@@ -47,6 +54,7 @@ export function parseSearch(search: string): AppState {
     day: WEEKDAYS.find((d) => d === day) ?? DEFAULT_STATE.day,
     hour: isHour(hour) ? hour : DEFAULT_STATE.hour,
     visible,
+    zone: params.get('zone')?.trim() || DEFAULT_STATE.zone,
   };
 }
 
@@ -58,17 +66,20 @@ export function toSearch(state: AppState, search: string): string {
   const hidden = LAYER_KEYS.filter((k) => !state.visible[k]);
   if (hidden.length > 0) params.set('hide', hidden.join(','));
   else params.delete('hide');
+  if (state.zone !== ZONE_ALL) params.set('zone', state.zone);
+  else params.delete('zone');
   return `?${params.toString().replace(/%2C/g, ',')}`;
 }
 
 export interface StateChange {
   day?: Weekday;
   hour?: number;
+  zone?: string;
 }
 
 export interface AppStateStore {
   get(): AppState;
-  /** Change the day and/or hour. Throws if the hour is not a whole number 0 to 23. */
+  /** Change the day, hour and/or zone filter. Throws if the hour is not a whole number 0 to 23 or the zone is empty. */
   set(change: StateChange): void;
   setLayerVisible(key: LayerKey, visible: boolean): void;
   /** Called with the new state after every real change. Returns an unsubscribe function. */
@@ -90,8 +101,10 @@ export function createAppState(search = ''): AppStateStore {
       const hour = change.hour ?? state.hour;
       if (!isHour(hour)) throw new Error(`hour must be a whole number 0 to 23, not ${hour}`);
       if (!WEEKDAYS.includes(day)) throw new Error(`day must be one of ${WEEKDAYS.join(', ')}, not ${day}`);
-      if (day === state.day && hour === state.hour) return;
-      commit({ ...state, day, hour });
+      const zone = change.zone ?? state.zone;
+      if (zone.trim() === '') throw new Error('zone must not be empty');
+      if (day === state.day && hour === state.hour && zone === state.zone) return;
+      commit({ ...state, day, hour, zone });
     },
     setLayerVisible(key, visible) {
       if (state.visible[key] === visible) return;
