@@ -36,6 +36,20 @@
       #time-controls button[aria-pressed="true"] { background: #1a73e8; color: #fff; border-color: #1a73e8; }
       #time-controls .time-row { display: flex; align-items: center; gap: 8px; }
       #time-controls .time-row input[type="range"] { flex: 1; min-width: 0; }
+      #curb-detail {
+        position: absolute; right: 10px; top: 110px; z-index: 2; box-sizing: border-box; padding: 8px 12px;
+        width: min(340px, calc(100% - 20px)); max-height: calc(100% - 200px); overflow-y: auto;
+        font: 12px system-ui, sans-serif; background: rgba(255, 255, 255, 0.97); border-radius: 4px;
+      }
+      #curb-detail[hidden] { display: none; }
+      #curb-detail h2 { margin: 6px 0 2px; font-size: 16px; }
+      #curb-detail h3 { margin: 10px 0 2px; font-size: 13px; }
+      #curb-detail p { margin: 2px 0; }
+      #curb-detail ul { margin: 4px 0 0; padding: 0; list-style: none; }
+      #curb-detail .curb-rule { margin: 4px 0; padding: 4px 6px; border-left: 4px solid #bbb; background: #f6f6f6; }
+      #curb-detail .curb-rule.active { border-left-color: #1a73e8; background: #e8f0fe; }
+      #curb-detail .curb-note { color: #555; }
+      #curb-detail .curb-unmapped { font-weight: 600; }
       #permit-zones-legend {
         position: absolute; left: 10px; top: 190px; z-index: 1; padding: 6px 10px;
         font: 12px system-ui, sans-serif; background: rgba(255, 255, 255, 0.92); border-radius: 4px;

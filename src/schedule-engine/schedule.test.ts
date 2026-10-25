@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { instantFor, isActive, localDayHour, nextChange } from './index';
+import { instantFor, isActive, localDayHour, localParts, nextChange } from './index';
 import type { Schedule } from './index';
 
 // All instants are written in UTC. Burbank is UTC-8 (PST) until 2026-03-08
@@ -259,5 +259,29 @@ describe('localDayHour', () => {
     expect(localDayHour(at('2026-11-01T08:59:59Z'))).toEqual({ weekday: 'sun', hour: 1 });
     expect(localDayHour(at('2026-11-01T09:00:00Z'))).toEqual({ weekday: 'sun', hour: 1 });
     expect(localDayHour(at('2026-11-01T10:00:00Z'))).toEqual({ weekday: 'sun', hour: 2 });
+  });
+});
+
+describe('localParts', () => {
+  it('reads weekday, hour, minute and a day number on the city clock', () => {
+    // 03:30 UTC on Mon 5 Jan is still Sun 4 Jan 19:30 in Burbank.
+    const sun = localParts(at('2026-01-05T03:30:00Z'));
+    expect(sun).toMatchObject({ weekday: 'sun', hour: 19, minute: 30 });
+    const mon = localParts(at('2026-01-05T16:45:00Z'));
+    expect(mon).toMatchObject({ weekday: 'mon', hour: 8, minute: 45 });
+    expect(mon.dayNumber - sun.dayNumber).toBe(1);
+  });
+
+  it('counts calendar days on the city clock, not 24 hour spans', () => {
+    // Fri 23:00 to Sat 06:00 local is 7 hours but 1 calendar day.
+    const from = localParts(at('2026-01-10T07:00:00Z'));
+    const to = localParts(at('2026-01-10T14:00:00Z'));
+    expect(to.dayNumber - from.dayNumber).toBe(1);
+  });
+
+  it('keeps counting across a DST change', () => {
+    const before = localParts(at('2026-03-07T20:00:00Z'));
+    const after = localParts(at('2026-03-09T20:00:00Z'));
+    expect(after.dayNumber - before.dayNumber).toBe(2);
   });
 });

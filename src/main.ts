@@ -1,4 +1,5 @@
-import { createBasemap } from './basemap';
+import { createBasemap, UNMAPPED_MESSAGE } from './basemap';
+import { createCurbDetail } from './curb-detail';
 import { bannerText, getDataSet, loadCity } from './data-loader';
 import { drawCurbColors, drawNoStopping, drawPermitZones, drawRestrictions, drawSweeping, drawTimedParking, drawZoning } from './layers';
 import type { TimeSelection } from './layers';
@@ -59,6 +60,10 @@ loadCity(CITY_ID)
     const noStopping = drawNoStopping(basemap.map, city.restrictions, city.trim, initial, zone, basemap.underLabelsLayerId, app);
     toggles.no_stopping = noStopping.setVisible;
     timeUpdates.push(noStopping.update);
+
+    // Clicking a block lists every rule on both its sides, from the loaded rows rather than what is drawn (M4-3).
+    const detail = createCurbDetail(app, city, { timeZone: zone, unmappedMessage: UNMAPPED_MESSAGE, state });
+    basemap.onSegmentClick((segmentId) => detail.show(segmentId));
 
     // Every layer reads the one state: a change to it restyles them all.
     let shown: AppState = initial;

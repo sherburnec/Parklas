@@ -189,3 +189,17 @@ export function instantFor(weekday: Weekday, hour: number, timeZone: string = DE
   const { year, month, day } = REFERENCE_SUNDAY;
   return instantAt(year, month, day + WEEKDAYS.indexOf(weekday), hour * 60, timeZone);
 }
+
+/** Wall-clock parts of an instant on the city clock. `dayNumber` counts calendar days, so two of them subtract to whole days later. */
+export function localParts(
+  instant: Date,
+  timeZone: string = DEFAULT_TIME_ZONE,
+): { weekday: Weekday; hour: number; minute: number; dayNumber: number } {
+  const { local } = wallClock(instant, timeZone);
+  return {
+    weekday: local.weekday,
+    hour: Math.floor(local.minutes / 60),
+    minute: local.minutes % 60,
+    dayNumber: Math.round(Date.UTC(local.year, local.month - 1, local.day) / 86_400_000),
+  };
+}

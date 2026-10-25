@@ -3,11 +3,12 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import type { FeatureCollection, LineString } from 'geojson';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 
-import { tagCoverage, UNMAPPED_MESSAGE } from './coverage';
+import { tagCoverage } from './coverage';
 
 maplibregl.setWorkerUrl(workerUrl);
 
 const SOURCE_ID = 'segments';
+const MAPPED_LAYER_ID = 'segments-line';
 const UNMAPPED_LAYER_ID = 'segments-unmapped';
 // Wider than the drawn line so thin streets are easy to hit with a finger.
 const HIT_RADIUS_PX = 8;
@@ -21,7 +22,7 @@ function styleFor(segments: FeatureCollection<LineString>): maplibregl.StyleSpec
     layers: [
       { id: 'background', type: 'background', paint: { 'background-color': '#f4f4f2' } },
       {
-        id: 'segments-line',
+        id: MAPPED_LAYER_ID,
         type: 'line',
         source: SOURCE_ID,
         filter: ['==', ['get', 'mapped'], true],
@@ -73,6 +74,8 @@ export interface Basemap {
   underStreetsLayerId: string;
   /** Rule bands that must stay under the street names are added before this layer id. */
   underLabelsLayerId: string;
+  /** Calls `handler` with the segment_id of the street block clicked, mapped or not (task M4-3). */
+  onSegmentClick(handler: (segmentId: string) => void): void;
   /** Resolves once the style and street lines are loaded. */
   ready: Promise<void>;
   destroy(): void;
@@ -104,21 +107,30 @@ export function createBasemap(
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
-  const unmappedAt = (point: maplibregl.Point) => {
+  const segmentAt = (point: maplibregl.Point): string | null => {
     const box: [maplibregl.PointLike, maplibregl.PointLike] = [
       [point.x - HIT_RADIUS_PX, point.y - HIT_RADIUS_PX],
       [point.x + HIT_RADIUS_PX, point.y + HIT_RADIUS_PX],
     ];
-    return map.queryRenderedFeatures(box, { layers: [UNMAPPED_LAYER_ID] }).length > 0;
+    const hit = map.queryRenderedFeatures(box, { layers: [MAPPED_LAYER_ID, UNMAPPED_LAYER_ID] })[0];
+    return hit ? (hit.properties.segment_id as string) : null;
   };
+  const handlers: Array<(segmentId: string) => void> = [];
   map.on('click', (e) => {
-    if (!unmappedAt(e.point)) return;
-    new maplibregl.Popup({ closeButton: true }).setLngLat(e.lngLat).setText(UNMAPPED_MESSAGE).addTo(map);
+    const id = segmentAt(e.point);
+    if (id !== null) for (const handler of handlers) handler(id);
   });
   map.on('mousemove', (e) => {
-    map.getCanvas().style.cursor = unmappedAt(e.point) ? 'pointer' : '';
+    map.getCanvas().style.cursor = segmentAt(e.point) !== null ? 'pointer' : '';
   });
 
   const ready = new Promise<void>((resolve) => map.once('load', () => resolve()));
-  return { map, underStreetsLayerId: 'segments-line', underLabelsLayerId: 'segments-label', ready, destroy: () => map.remove() };
+  return {
+    map,
+    underStreetsLayerId: MAPPED_LAYER_ID,
+    underLabelsLayerId: 'segments-label',
+    onSegmentClick: (handler) => void handlers.push(handler),
+    ready,
+    destroy: () => map.remove(),
+  };
 }
