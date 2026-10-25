@@ -33,9 +33,9 @@ const polar = (x: number, y: number, deg: number, d: number): [number, number] =
 const reach = bandReachMetres(config);
 
 describe('band config', () => {
-  it('reaches about 4.4 m: the outer band edge of four 2 px bands at z17', () => {
-    expect(reach).toBeGreaterThan(4.2);
-    expect(reach).toBeLessThan(4.6);
+  it('reaches about 5.4 m: the outer band edge of five 2 px bands at z17', () => {
+    expect(reach).toBeGreaterThan(5.2);
+    expect(reach).toBeLessThan(5.6);
   });
 
   it('is what the layers draw with: they read the same file', () => {
