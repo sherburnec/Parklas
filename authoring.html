@@ -9,11 +9,13 @@
       body { display: flex; flex-direction: column; font: 14px system-ui, sans-serif; }
       #app { flex: 1; min-height: 0; position: relative; }
       #data-banner { padding: 6px 12px; text-align: center; font-weight: 600; color: #5c3b00; background: #ffd966; }
-      #key, #detail {
+      #key, #detail, #coords {
         position: absolute; z-index: 1; padding: 8px 12px; background: rgba(255, 255, 255, 0.95);
         border-radius: 4px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
       }
       #key { left: 10px; bottom: 28px; }
+      #coords { right: 10px; bottom: 28px; font-variant-numeric: tabular-nums; }
+      #coords[hidden] { display: none; }
       #detail { left: 10px; top: 10px; max-width: 320px; }
       #detail[hidden] { display: none; }
       #detail h1 { margin: 0 0 6px; font-size: 14px; }
@@ -31,6 +33,7 @@
         <div>Click a segment to copy its segment_id</div>
       </div>
       <div id="detail" hidden></div>
+      <div id="coords" role="status" hidden></div>
     </div>
     <script type="module" src="/src/authoring/main.ts"></script>
   </body>

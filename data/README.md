@@ -32,6 +32,14 @@ The `DATA_SET` setting picks which folders `validate`, `build:data` and the page
 
 Never edit `segments.geojson`. It is the street list and must not change. Every `L` and `R` in `rules.csv` is read against the direction of its segment in that file, so a segment drawn the other way round would put its rows on the opposite curb. When the file is deliberately re-extracted (`node scripts/extract-burbank-segments.ts --force`), the script lists every segment whose direction is reversed, next to the added, removed and changed ones. It only reports; check the rows for those segments yourself.
 
+Every block runs in a set city-grid direction, so `L` stays on the same side all along a street:
+
+- Olive Avenue runs outward from where West Olive becomes East Olive, just south of Front Street: East Olive toward the top right (northeast), the rest of Olive toward the bottom left (southwest).
+- North/South streets run outward from Olive: a North street away from Olive toward city north, a South street toward city south. On a North street `L` is the city-west curb; on a South street it is the city-east curb.
+- Every other East/West street runs like Olive, outward from the east-west line through that same point: an East street toward city east, a West street toward city west. On an East street `L` is the city-north curb; on a West street it is the city-south curb.
+
+A street's North/South/East/West prefix decides its direction. A street with no prefix follows its prefixed namesake (Victory Boulevard runs like North and South Victory) or, failing that, the grid around it. Winding hill roads, forks and twin one-way roads can still change direction partway, so check the arrow on the authoring page. The extraction applies the same rule. `node scripts/orient-burbank-segments.ts` reapplies it to the frozen file and lists any rows on blocks it turned round. The numbers in a `segment_id` do not tell you which end comes first.
+
 ## Short blocks and inner sides on the map
 
 `npm run build:data` also writes `metadata.json` next to the built files, holding the folder's last-updated date, which is the day of the build in the city's time zone. The page shows it at the bottom.

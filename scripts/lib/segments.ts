@@ -179,6 +179,11 @@ export function findBlocksCrossingIntersections(fc: SegmentCollection): string[]
   return bad.sort();
 }
 
+/** The frozen file's layout: one feature per line keeps git diffs readable. */
+export function serializeSegments(fc: SegmentCollection): string {
+  return `{"type":"FeatureCollection","features":[\n${fc.features.map((f) => JSON.stringify(f)).join(',\n')}\n]}\n`;
+}
+
 const signature = (f: SegmentFeature) => JSON.stringify([f.properties, f.geometry.coordinates]);
 
 export function diffSegments(before: SegmentCollection, after: SegmentCollection): SegmentDiff {

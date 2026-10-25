@@ -104,6 +104,7 @@ Sizes: S = up to 1 day, M = 2 to 4 days, L = 1 to 2 weeks, part-time. Estimates 
 | M5-3 ✅ | Basemap isolation test covering the app and the authoring page | AR-1 |
 | M5-4 ✅ | Storage audit and a test that fails on any browser storage use | AR-4 |
 | M5-5 ✅ | Block numbers from OSM addresses in `blocks.csv`, shown in the curb detail heading | FR-9, DM-3 |
+| M5-6 ✅ | Consistent block direction: Olive runs outward from the West/East Olive split just south of Front Street (northeast on East Olive, southwest on the rest), North/South streets outward from Olive, other East/West streets outward like Olive. Set by name prefix, then a prefixed namesake, then the local grid. Same ids; 1,185 blocks reversed with `from_street`/`to_street` swapped; the extraction applies the rule; `trim.json` and the sample set (new `SAMPLE_SEED`) regenerated | FR-11, DM-3 |
 | TD-1 ✅ | Sample data set, `DATA_SET` setting and sample banner | Testing |
 | TD-2 ✅ | Seeded citywide sample rules on all layers, plus `SAMPLE-` zoning and `DEMO-` permit polygons | Testing |
 | TD-2.2 ✅ | Denser sample data. Target share: **75%** of blocks carry a rule row. A test compares this value with `TARGET_MAPPED_SHARE` in `scripts/lib/sample-data.ts`; to change it, edit both, untick, and re-run TD-2.2 | Testing |
@@ -120,13 +121,14 @@ Sizes: S = up to 1 day, M = 2 to 4 days, L = 1 to 2 weeks, part-time. Estimates 
 
 | ID | Task | Depends on | Size | Done when | Req |
 | --- | --- | --- | --- | --- | --- |
+| M2-7.2 | Revision of M2-7: the authoring page shows the longitude and latitude of the last point clicked on the map, in a fixed box at the bottom right. The box is empty until the first click and updates on every click, on a block or off it. Authoring page only; the public page is unchanged. Click-to-copy of the segment ID is unchanged. State stays in memory | M2-7 | S | After a click the box shows that point's coordinates to 6 decimals; a later click replaces them; the public page has no such box; `npm test` and `npm run build` pass | DM-3 |
 | TD-10 | Switch the public site to real data: `data/burbank/` holds empty rule files from the templates, and the site opens on `burbank` by default. `burbank-sample` stays for tests and is never the default | M2-5, TD-1 | S | A build with `DATA_SET=real` passes; the site opens on real data with no sample banner; `public/data/burbank/` has no `SAMPLE-` or `DEMO-` codes; every block not yet entered shows as not yet mapped | Testing |
 | M6-1 | Pilot data: one dense area, all layers | TD-10 | M | Area passes the validator and every layer has rows | Phasing |
 | M6-2 | Accuracy walk: check 20 pilot curb sides against signs | M6-1 | M | 20 of 20 match or are corrected | Risk 1 |
 | M6-4 | Revisit `docs/data-dependent-decisions.md` against the pilot data and citywide segments; set every row to Confirmed or Changed with evidence; update `docs/spike-notes.md` and the build tests for any changed value | M6-1, M6-2 | S | No row is still Set or Open; `npm test` and `npm run build` pass | FR-9, FR-11 |
 | M6-3 | Phase 1 review: fill in the PRD handoff section | all | S | Every PRD exit criterion is ticked or explained | Phasing |
 
-Order: TD-10, M6-1, M6-2, M6-4, M6-3. Data entry paces all of it.
+Order: M2-7.2, TD-10, M6-1, M6-2, M6-4, M6-3. Data entry paces all of it.
 
 ## Testing and rollout
 

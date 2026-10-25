@@ -14,9 +14,11 @@ import {
   diffSegments,
   findBlocksCrossingIntersections,
   findDirectionChanges,
+  serializeSegments,
   type OsmElement,
   type SegmentCollection,
 } from './lib/segments.ts';
+import { BURBANK_GRID, orientSegments } from './lib/orientation.ts';
 
 const CITY_ID = 'burbank';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -79,11 +81,6 @@ async function download(): Promise<OsmElement[]> {
   throw new Error('All Overpass endpoints failed.');
 }
 
-function serialize(fc: SegmentCollection): string {
-  // One feature per line keeps git diffs readable.
-  return `{"type":"FeatureCollection","features":[\n${fc.features.map((f) => JSON.stringify(f)).join(',\n')}\n]}\n`;
-}
-
 function report(label: string, ids: string[]) {
   console.log(`  ${label}: ${ids.length}`);
   for (const id of ids.slice(0, 50)) console.log(`    ${id}`);
@@ -105,7 +102,8 @@ async function main() {
   const previous = exists ? (JSON.parse(readFileSync(segmentsPath, 'utf8')) as SegmentCollection) : null;
 
   const elements = await download();
-  const fc = buildSegments(elements, CITY_ID);
+  // Blocks are drawn in the city-grid direction (task M5-6), so a re-extraction reports no reversals of its own.
+  const fc = orientSegments(buildSegments(elements, CITY_ID), BURBANK_GRID).collection;
   if (fc.features.length === 0) throw new Error('No blocks were built; refusing to write an empty file.');
 
   const crossing = findBlocksCrossingIntersections(fc);
@@ -114,7 +112,7 @@ async function main() {
   }
 
   mkdirSync(dir, { recursive: true });
-  writeFileSync(segmentsPath, serialize(fc));
+  writeFileSync(segmentsPath, serializeSegments(fc));
   const streets = new Set(fc.features.map((f) => f.properties.street));
   console.log(`Wrote ${fc.features.length} blocks on ${streets.size} named streets to ${segmentsPath}`);
 

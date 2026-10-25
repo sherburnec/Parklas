@@ -11,18 +11,18 @@ Each case below is one street side whose rules are the last rows of `rules.csv`.
 
 | Case | segment_id | Street | Cross streets | Side | What it tests |
 | --- | --- | --- | --- | --- | --- |
-| A | `burbank-1790974706-1790974762` | Winona Avenue | North Reese Place and North Orchard Drive | L | Stack with a midnight crossing, a null schedule and an 08:30 start |
-| B | `burbank-35315142-122940798` | West Magnolia Boulevard | Evergreen Street and North Pass Avenue | R | Stack with a Sunday-into-Monday window |
-| C | `burbank-79183030-79183039` | Cedar Avenue | Kenneth Road and South Bel Aire Drive | L | Stack with a weeks_of_month [1, 3] row |
-| D | `burbank-13511091009-13511091010` | Burbank Boulevard | North Pass Avenue and Maple Street | R | Inner-facing side with one rule |
-| E | `burbank-78826575-725245678` | West Allen Avenue | Edison Boulevard and Edison Boulevard | L | Sliver with one rule |
+| A | `burbank-122864774-122949983` | North Lamer Street | Whitney Lane and Wedgewood Lane | L | Stack with a midnight crossing, a null schedule and an 08:30 start |
+| B | `burbank-122647361-122907126` | West Chandler Boulevard North | North Naomi Street and North Florence Street | L | Stack with a Sunday-into-Monday window |
+| C | `burbank-123467938-123473379` | Moss Street | West Linden Avenue and Linden Court | L | Stack with a weeks_of_month [1, 3] row |
+| D | `burbank-6606789893-6606789900` | Empire Avenue | Clybourn Avenue and (none) | L | Inner-facing side with one rule |
+| E | `burbank-725245616-9996406093` | Edison Boulevard | Maple Street and West Allen Avenue | L | Sliver with one rule |
 
 ## Case A: Stack with a midnight crossing, a null schedule and an 08:30 start
 
-- segment_id: `burbank-1790974706-1790974762`
-- Street: Winona Avenue, between North Reese Place and North Orchard Drive
+- segment_id: `burbank-122864774-122949983`
+- Street: North Lamer Street, between Whitney Lane and Wedgewood Lane
 - Side: **L**
-- Permit zone: DEMO-B
+- Permit zone: none
 - Drawing: drawn, one band per layer
 - Sweeping starts at 08:30. The slider steps by the hour, so at Tue 08:00 it shows not active and at Tue 09:00 active; the detail list always shows 08:30 to 10:30.
 - The no parking window runs Fri 22:00 to Sat 06:00 and Sat 22:00 to Sun 06:00. At Sat 02:00 it is active through Friday night's window.
@@ -65,9 +65,9 @@ Each case below is one street side whose rules are the last rows of `rules.csv`.
 
 ## Case B: Stack with a Sunday-into-Monday window
 
-- segment_id: `burbank-35315142-122940798`
-- Street: West Magnolia Boulevard, between Evergreen Street and North Pass Avenue
-- Side: **R**
+- segment_id: `burbank-122647361-122907126`
+- Street: West Chandler Boulevard North, between North Naomi Street and North Florence Street
+- Side: **L**
 - Permit zone: none
 - Drawing: drawn, one band per layer
 - No standing runs from Sun 20:00 to Mon 04:00. It is active at Mon 02:00 although Monday is not in its days.
@@ -109,8 +109,8 @@ Each case below is one street side whose rules are the last rows of `rules.csv`.
 
 ## Case C: Stack with a weeks_of_month [1, 3] row
 
-- segment_id: `burbank-79183030-79183039`
-- Street: Cedar Avenue, between Kenneth Road and South Bel Aire Drive
+- segment_id: `burbank-123467938-123473379`
+- Street: Moss Street, between West Linden Avenue and Linden Court
 - Side: **L**
 - Permit zone: none
 - Drawing: drawn, one band per layer
@@ -154,9 +154,9 @@ Each case below is one street side whose rules are the last rows of `rules.csv`.
 
 ## Case D: Inner-facing side with one rule
 
-- segment_id: `burbank-13511091009-13511091010`
-- Street: Burbank Boulevard, between North Pass Avenue and Maple Street
-- Side: **R**
+- segment_id: `burbank-6606789893-6606789900`
+- Street: Empire Avenue, between Clybourn Avenue and (none)
+- Side: **L**
 - Permit zone: none
 - Drawing: not drawn at any hour (inner-facing side); its rule still appears in the detail list
 - trim.json flags this side as inner-facing, so the map never draws it at any hour. The curb detail list must still list the rule, with its state and next change.
@@ -186,8 +186,8 @@ Each case below is one street side whose rules are the last rows of `rules.csv`.
 
 ## Case E: Sliver with one rule
 
-- segment_id: `burbank-78826575-725245678`
-- Street: West Allen Avenue, between Edison Boulevard and Edison Boulevard
+- segment_id: `burbank-725245616-9996406093`
+- Street: Edison Boulevard, between Maple Street and West Allen Avenue
 - Side: **L**
 - Permit zone: none
 - Drawing: a sliver (under 20 m), drawn because it has a rule in this layer

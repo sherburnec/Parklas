@@ -90,8 +90,8 @@ describe('block heading (task M5-5)', () => {
     expect(view.blockNumber).toBe(1200);
     expect(view.heading).toBe('1200 block of Winona Avenue');
     // The cross streets line is unchanged.
-    expect(view.fromStreet).toBe('North Reese Place');
-    expect(view.toStreet).toBe('North Orchard Drive');
+    expect(view.fromStreet).toBe('North Orchard Drive');
+    expect(view.toStreet).toBe('North Reese Place');
   });
 
   it('writes block number 0 as "0 block of", since 0 is a real block number', () => {
@@ -122,16 +122,16 @@ describe('block heading (task M5-5)', () => {
 });
 
 describe('describeSegment', () => {
-  const id = 'burbank-1790974706-1790974762';
+  const id = 'burbank-122931465-122931467';
 
   it('lists both sides of a segment with street and cross streets', () => {
     const view = describeSegment(data, id, { day: 'tue', hour: 9 }, ZONE);
     expect(view.mapped).toBe(true);
-    expect(view.street).toBe('Winona Avenue');
-    expect(view.fromStreet).toBe('North Reese Place');
-    expect(view.toStreet).toBe('North Orchard Drive');
+    expect(view.street).toBe('Groton Drive');
+    expect(view.fromStreet).toBe('North 6th Street');
+    expect(view.toStreet).toBe('Jolley Drive');
     expect(view.sides.map((s) => s.side)).toEqual(['L', 'R']);
-    expect(view.sides[0].rules).toHaveLength(4);
+    expect(view.sides[0].rules).toHaveLength(3);
     expect(view.sides[0].permitZone).toBe('DEMO-B');
   });
 
@@ -254,7 +254,8 @@ describe('test-cases.md', () => {
 
       it('shows the street, cross streets and permit zone', () => {
         const { view, side } = sideOf(c.times[0].label);
-        expect(`${view.street}, between ${view.fromStreet} and ${view.toStreet}`).toBe(c.street);
+        // test-cases.md writes a missing cross street as "(none)"; the view leaves it empty.
+        expect(`${view.street}, between ${view.fromStreet || '(none)'} and ${view.toStreet || '(none)'}`).toBe(c.street);
         expect(side.permitZone ?? null).toBe(c.permitZone);
         expect(view.mapped).toBe(true);
       });

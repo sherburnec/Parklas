@@ -545,12 +545,12 @@ describe('data/burbank-sample', () => {
   const csv = readFileSync(resolve(root, 'burbank-sample', 'rules.csv'), 'utf8');
   const rows = parseRuleRows(csv);
 
-  it('is exactly what the generator writes (seed 20261023)', () => {
+  it('is exactly what the generator writes (seed 20261050)', () => {
     const permitZones = JSON.parse(readFileSync(resolve(root, 'burbank-sample', 'permit-zones.geojson'), 'utf8')) as PermitZoneCollection;
     const context = { zoning: generateZoning(real, 'burbank-sample'), permitZones };
     const trim = JSON.parse(readFileSync(resolve(root, 'burbank', 'trim.json'), 'utf8')) as TrimData;
-    const base = generateSampleRows(real, 20261023, context);
-    expect(csv.replace(/\r\n/g, '\n')).toBe(rowsToCsv(addEdgeCases(base, pickEdgeCases(base, real, trim, 20261023)))); // edge cases: TD-9
+    const base = generateSampleRows(real, 20261050, context);
+    expect(csv.replace(/\r\n/g, '\n')).toBe(rowsToCsv(addEdgeCases(base, pickEdgeCases(base, real, trim, 20261050)))); // edge cases: TD-9
   });
 
   it('has rows for every rule layer in at least 4 distinct parts of the city', () => {

@@ -1,8 +1,9 @@
-// Authoring map (task M2-7): shows every segment's id, direction and L and R sides, so rule rows can be written
+// Authoring map (tasks M2-7, M2-7.2): shows every segment's id, direction and L and R sides, so rule rows can be written
 // against the right segment and side. A separate entry point; the public app does not link to or import it.
 import type { GeoJSONSource, MapMouseEvent } from 'maplibre-gl';
 import { createBasemap } from '../basemap';
 import { bannerText, getDataSet, loadCity } from '../data-loader';
+import { formatCoordinates } from './coordinates';
 import { authoringSides } from './sides';
 
 const CITY_ID = 'burbank';
@@ -14,6 +15,7 @@ const HIT_RADIUS_PX = 8;
 
 const app = document.getElementById('app') as HTMLElement;
 const detail = document.getElementById('detail') as HTMLElement;
+const coords = document.getElementById('coords') as HTMLElement;
 
 const text = bannerText(getDataSet());
 if (text) {
@@ -134,6 +136,8 @@ loadCity(CITY_ID)
     });
 
     map.on('click', async (e: MapMouseEvent) => {
+      coords.textContent = `Last click (lng, lat): ${formatCoordinates(e.lngLat)}`;
+      coords.hidden = false;
       const hit = map.queryRenderedFeatures(e.point, { layers: [HIT_LAYER] })[0];
       if (!hit) return;
       const props = hit.properties as Record<string, unknown>;

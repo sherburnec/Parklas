@@ -7,7 +7,7 @@ import type { RuleRow, SegmentCollection, Side } from './build.ts';
 import { sidePointAt } from './permit-zones.ts';
 import type { ZoningCollection } from './sample-zoning.ts';
 
-export const SAMPLE_SEED = 20261023;
+export const SAMPLE_SEED = 20261050;
 const ONE_IN = 15;
 const PICK_GRID = 8; // the city is cut into 8 x 8 cells and each cell contributes its share, so picks cannot clump
 
