@@ -1,4 +1,4 @@
-// Write data/burbank-sample/rules.csv (made-up rules on about 1 in 15 Burbank segments, task TD-2)
+// Write data/burbank-sample/rules.csv (made-up rules on TARGET_MAPPED_SHARE of Burbank segments, tasks TD-2 and TD-2.2)
 // zoning.geojson + zoning-categories.json (SAMPLE- zones tiling the whole city, task TD-3),
 // permit-zones.geojson (8 DEMO- permit zones grown from city blocks, task TD-8)
 // and curb-colors.json (the five sample curb colors, task TD-7).

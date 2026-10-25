@@ -1,6 +1,7 @@
 // Pure logic for the sample-data generator (task TD-2). No file I/O here: the CLI reads and writes the files.
 //
-// Picks about 1 in 15 segments, spread over the whole city, and gives each some made-up rules.
+// Picks about 1 in 15 segments, spread over the whole city, and gives each some made-up rules. The later steps add more,
+// and the last one (TD-2.2) tops up the share of blocks with a rule to TARGET_MAPPED_SHARE.
 // Everything random comes from a seeded generator, so the same segments and seed give the same rows.
 import type { RuleRow, SegmentCollection, Side } from './build.ts';
 import { sidePointAt } from './permit-zones.ts';
@@ -521,7 +522,55 @@ function spreadCurbColors(rows: RuleRow[], segments: SegmentCollection, seed: nu
   return [...rows, ...added];
 }
 
-export function generateSampleRows(segments: SegmentCollection, seed: number, context?: SampleContext): RuleRow[] {
+// Target share of mapped blocks (task TD-2.2). The value lives in the TD-2.2 row of docs/PLAN.md; a test fails if the two differ.
+export const TARGET_MAPPED_SHARE = 0.75;
+const NEW_LAYER_ODDS: [Layer, number][] = [['timed_parking', 0.4], ['restrictions', 0.35], ['curb_color', 0.25]];
+const NEW_RESTRICTIONS = ['no_parking', 'no_parking', 'no_parking', 'no_standing', 'no_stopping'] as const;
+const SWEEP_IN_AREA = 0.7; // chance a new block inside a sweeping area gets day-by-day sweeping rather than another layer
+
+/**
+ * Tops up the blocks with a rule until `target` of all blocks have one (task TD-2.2). Unmapped blocks are picked at
+ * random, so they spread evenly over the city, and most get one rule. Permit codes are left off these rows.
+ * Own generator, new rows go on the end, so no earlier row moves. Adds nothing if the target is already met.
+ */
+function densify(rows: RuleRow[], segments: SegmentCollection, seed: number, target: number): RuleRow[] {
+  const rng = mulberry32((seed ^ 0x44454e53) >>> 0);
+  const mapped = new Set(rows.map((r) => r.segment_id));
+  const need = Math.ceil(target * segments.features.length - 1e-9) - mapped.size;
+  if (need <= 0) return rows;
+  const free = segments.features.filter((f) => !mapped.has(f.properties.segment_id)).sort((a, b) => (a.properties.segment_id < b.properties.segment_id ? -1 : 1));
+  const added: RuleRow[] = [];
+  for (const segment of shuffle(free, rng).slice(0, need)) {
+    const id = segment.properties.segment_id;
+    const sweepDays = areaSweepDays(segment, segments);
+    if (sweepDays && chance(SWEEP_IN_AREA, rng)) {
+      added.push(...dayByDaySweepingRows(id, SIDES, sweepDays, rng));
+      continue;
+    }
+    const layer = (() => {
+      let r = rng();
+      for (const [l, p] of NEW_LAYER_ODDS) if ((r -= p) < 0) return l;
+      return NEW_LAYER_ODDS[0][0];
+    })();
+    const side = pick(SIDES, rng);
+    const row: RuleRow = { segment_id: id, side, layer, type: null, limit_minutes: null, permit_code: null, permit_mode: null, color_key: null, schedule: null };
+    if (layer === 'timed_parking') {
+      row.limit_minutes = pick(SPREAD_LIMITS, rng);
+      row.schedule = spreadSchedule(rng);
+    } else if (layer === 'restrictions') {
+      row.type = pick(NEW_RESTRICTIONS, rng);
+      row.schedule = restrictionSchedule(row.type, rng);
+    } else {
+      row.color_key = pick(Object.keys(CURB_COLORS), rng);
+      row.schedule = colorSchedule(row.color_key, rng);
+    }
+    added.push(row);
+  }
+  return [...rows, ...added];
+}
+
+/** `targetShare` is the share of blocks that should carry a rule (task TD-2.2); null skips that step. Needs `context`. */
+export function generateSampleRows(segments: SegmentCollection, seed: number, context?: SampleContext, targetShare: number | null = TARGET_MAPPED_SHARE): RuleRow[] {
   const rng = mulberry32(seed);
   const picked = pickSegments(segments, rng);
   const rows: RuleRow[] = [];
@@ -539,7 +588,8 @@ export function generateSampleRows(segments: SegmentCollection, seed: number, co
   }
   if (!context) return rows;
   const restricted = spreadRestrictions(spreadTimedParking(alignPermitCodes(rows, segments, context), segments, context, seed), segments, context, seed);
-  return spreadCurbColors(ensureEveryZoneHasRule(spreadExemptions(restricted, segments, context, seed), segments, context, seed), segments, seed);
+  const spread = spreadCurbColors(ensureEveryZoneHasRule(spreadExemptions(restricted, segments, context, seed), segments, context, seed), segments, seed);
+  return targetShare === null ? spread : densify(spread, segments, seed, targetShare);
 }
 
 const HEADER = 'segment_id,side,layer,type,limit_minutes,permit_code,permit_mode,color_key,schedule';

@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildLayers, parseRuleRows, type RuleRow, type SegmentCollection } from './build.ts';
 import { generatePermitZones, permitZonesToJson } from './sample-permit-zones.ts';
-import { cellOf, CURB_COLORS, curbColorsToJson, generateSampleRows, isCorner, permitCodeAt, rowsToCsv, SAMPLE_SEED, zoneAt, type PermitZoneCollection } from './sample-data.ts';
+import { cellOf, CURB_COLORS, curbColorsToJson, generateSampleRows, isCorner, permitCodeAt, rowsToCsv, SAMPLE_SEED, TARGET_MAPPED_SHARE, zoneAt, type PermitZoneCollection } from './sample-data.ts';
 import { generateZoning } from './sample-zoning.ts';
 
 // A 60 x 60 street grid over Burbank's extent: alternating east-west and north-south blocks.
@@ -161,20 +161,21 @@ describe('day-by-day sweeping (TD-4)', () => {
   });
 });
 
+// The earlier spreads (TD-5 to TD-8) are checked on the rows before the TD-2.2 top-up (target share null), so they test their own step.
 // Timed parking spread (TD-5), checked against the real segments, zoning and permit zones.
 describe('timed parking spread (TD-5)', () => {
   const data = resolve(import.meta.dirname, '..', '..', 'data');
   const real = JSON.parse(readFileSync(resolve(data, 'burbank', 'segments.geojson'), 'utf8')) as SegmentCollection;
   const permitZones = JSON.parse(readFileSync(resolve(data, 'burbank-sample', 'permit-zones.geojson'), 'utf8')) as PermitZoneCollection;
   const context = { zoning: generateZoning(real, 'burbank-sample'), permitZones };
-  const rows = generateSampleRows(real, SAMPLE_SEED, context);
+  const rows = generateSampleRows(real, SAMPLE_SEED, context, null);
   const timed = rows.filter((r) => r.layer === 'timed_parking');
   const realById = new Map(real.features.map((f) => [f.properties.segment_id, f]));
   const category = (id: string) => zoneAt(realById.get(id)!, context.zoning)?.properties.category;
   const commercialish = (id: string) => ['commercial', 'mixed_use'].includes(category(id) ?? '');
 
   it('is repeatable and leaves every other layer exactly as before', () => {
-    expect(generateSampleRows(real, SAMPLE_SEED, context)).toEqual(rows);
+    expect(generateSampleRows(real, SAMPLE_SEED, context, null)).toEqual(rows);
     const others = (rs: RuleRow[]) => rs.filter((r) => r.layer !== 'timed_parking' && r.layer !== 'restrictions' && r.layer !== 'curb_color'); // restrictions: see TD-6, curb_color: see TD-7
     expect(others(rows)).toEqual(others(generateSampleRows(real, SAMPLE_SEED)));
   });
@@ -249,7 +250,7 @@ describe('restrictions spread (TD-6)', () => {
   const real = JSON.parse(readFileSync(resolve(data, 'burbank', 'segments.geojson'), 'utf8')) as SegmentCollection;
   const permitZones = JSON.parse(readFileSync(resolve(data, 'burbank-sample', 'permit-zones.geojson'), 'utf8')) as PermitZoneCollection;
   const context = { zoning: generateZoning(real, 'burbank-sample'), permitZones };
-  const rows = generateSampleRows(real, SAMPLE_SEED, context);
+  const rows = generateSampleRows(real, SAMPLE_SEED, context, null);
   const base = generateSampleRows(real, SAMPLE_SEED);
   const restrictions = rows.filter((r) => r.layer === 'restrictions');
   const byId = new Map(real.features.map((f) => [f.properties.segment_id, f]));
@@ -266,7 +267,7 @@ describe('restrictions spread (TD-6)', () => {
     new Set(restrictions.filter((r) => kindOf(r) === kind).map((r) => cellOf(byId.get(r.segment_id)!, real, 3)));
 
   it('is repeatable, keeps the earlier restriction rows and leaves other layers alone', () => {
-    expect(generateSampleRows(real, SAMPLE_SEED, context)).toEqual(rows);
+    expect(generateSampleRows(real, SAMPLE_SEED, context, null)).toEqual(rows);
     const old = base.filter((r) => r.layer === 'restrictions');
     expect(restrictions.length).toBeGreaterThan(old.length);
     const noCode = (r: RuleRow) => JSON.stringify({ ...r, permit_code: null });
@@ -353,7 +354,7 @@ describe('permit codes against the permit zones (TD-8)', () => {
   const real = JSON.parse(readFileSync(resolve(data, 'burbank', 'segments.geojson'), 'utf8')) as SegmentCollection;
   const zoning = generateZoning(real, 'burbank-sample');
   const permitZones = generatePermitZones(real, zoning, 'burbank-sample');
-  const rows = generateSampleRows(real, SAMPLE_SEED, { zoning, permitZones });
+  const rows = generateSampleRows(real, SAMPLE_SEED, { zoning, permitZones }, null);
   const byId = new Map(real.features.map((f) => [f.properties.segment_id, f]));
   const coded = rows.filter((r) => r.permit_code !== null);
 
@@ -389,7 +390,7 @@ describe('curb colors spread (TD-7)', () => {
   const real = JSON.parse(readFileSync(resolve(data, 'burbank', 'segments.geojson'), 'utf8')) as SegmentCollection;
   const permitZones = JSON.parse(readFileSync(resolve(data, 'burbank-sample', 'permit-zones.geojson'), 'utf8')) as PermitZoneCollection;
   const context = { zoning: generateZoning(real, 'burbank-sample'), permitZones };
-  const rows = generateSampleRows(real, SAMPLE_SEED, context);
+  const rows = generateSampleRows(real, SAMPLE_SEED, context, null);
   const base = generateSampleRows(real, SAMPLE_SEED);
   const colored = rows.filter((r) => r.layer === 'curb_color');
   const byId = new Map(real.features.map((f) => [f.properties.segment_id, f]));
@@ -408,7 +409,7 @@ describe('curb colors spread (TD-7)', () => {
   });
 
   it('is repeatable, keeps every earlier curb color row and leaves other layers alone', () => {
-    expect(generateSampleRows(real, SAMPLE_SEED, context)).toEqual(rows);
+    expect(generateSampleRows(real, SAMPLE_SEED, context, null)).toEqual(rows);
     const old = base.filter((r) => r.layer === 'curb_color');
     expect(added.length).toBeGreaterThan(0);
     expect(colored.length).toBe(old.length + added.length);
@@ -451,6 +452,90 @@ describe('curb colors spread (TD-7)', () => {
   });
 });
 
+// Target share of mapped blocks (task TD-2.2): the generator tops mapped blocks up to a share set in docs/PLAN.md.
+describe('target share of mapped blocks (TD-2.2)', () => {
+  const data = resolve(import.meta.dirname, '..', '..', 'data');
+  const real = JSON.parse(readFileSync(resolve(data, 'burbank', 'segments.geojson'), 'utf8')) as SegmentCollection;
+  const permitZones = JSON.parse(readFileSync(resolve(data, 'burbank-sample', 'permit-zones.geojson'), 'utf8')) as PermitZoneCollection;
+  const context = { zoning: generateZoning(real, 'burbank-sample'), permitZones };
+  const before = generateSampleRows(real, SAMPLE_SEED, context, null);
+  const rows = generateSampleRows(real, SAMPLE_SEED, context);
+  const added = rows.slice(before.length);
+  const total = real.features.length;
+  const share = (rs: RuleRow[]) => new Set(rs.map((r) => r.segment_id)).size / total;
+  const byId = new Map(real.features.map((f) => [f.properties.segment_id, f]));
+
+  it('takes its value from the TD-2.2 row of docs/PLAN.md', () => {
+    const plan = readFileSync(resolve(import.meta.dirname, '..', '..', 'docs', 'PLAN.md'), 'utf8');
+    const match = /\| TD-2\.2 [^\n]*Target share: \*\*(\d+(?:\.\d+)?)%\*\*/.exec(plan);
+    expect(match, 'PLAN.md has a TD-2.2 row with "Target share: **NN%**"').not.toBeNull();
+    expect(Number(match![1]) / 100).toBe(TARGET_MAPPED_SHARE);
+  });
+
+  it('brings the share of blocks with a rule up to the target and no further', () => {
+    expect(share(before)).toBeLessThan(TARGET_MAPPED_SHARE);
+    expect(share(rows)).toBeGreaterThanOrEqual(TARGET_MAPPED_SHARE);
+    expect(share(rows)).toBeLessThan(TARGET_MAPPED_SHARE + 1 / total + 1e-9);
+  });
+
+  it('follows any other target, and adds nothing when the target is already met', () => {
+    const half = generateSampleRows(real, SAMPLE_SEED, context, 0.5);
+    expect(share(half)).toBeGreaterThanOrEqual(0.5);
+    expect(share(half)).toBeLessThan(0.5 + 1 / total + 1e-9);
+    expect(generateSampleRows(real, SAMPLE_SEED, context, 0.01)).toEqual(before);
+  });
+
+  it('is repeatable and keeps every earlier row exactly where it was', () => {
+    expect(generateSampleRows(real, SAMPLE_SEED, context)).toEqual(rows);
+    expect(rows.slice(0, before.length)).toEqual(before);
+    expect(added.length).toBeGreaterThan(0);
+  });
+
+  it('puts new rows only on blocks that had none, and writes no duplicate side and layer', () => {
+    const had = new Set(before.map((r) => r.segment_id));
+    for (const r of added) expect(had.has(r.segment_id), r.segment_id).toBe(false);
+    expect(new Set(rows.map((r) => `${r.segment_id}|${r.side}|${r.layer}`)).size).toBe(rows.length);
+  });
+
+  it('leaves most new blocks with a single rule, which is fine', () => {
+    const perBlock = new Map<string, number>();
+    for (const r of added) perBlock.set(r.segment_id, (perBlock.get(r.segment_id) ?? 0) + 1);
+    const single = [...perBlock.values()].filter((n) => n === 1).length;
+    expect(single / perBlock.size).toBeGreaterThan(0.5);
+  });
+
+  it('adds every rule layer, in all nine parts of the city', () => {
+    for (const layer of ['sweeping', 'timed_parking', 'restrictions', 'curb_color'] as const) {
+      expect(added.some((r) => r.layer === layer), layer).toBe(true);
+    }
+    expect(new Set(added.map((r) => cellOf(byId.get(r.segment_id)!, real, 3))).size).toBe(9);
+  });
+
+  it('keeps the day-by-day sweeping pattern: both sides, different single days, no weeks of month', () => {
+    const sweeping = added.filter((r) => r.layer === 'sweeping');
+    const bySegment = new Map<string, RuleRow[]>();
+    for (const r of sweeping) bySegment.set(r.segment_id, [...(bySegment.get(r.segment_id) ?? []), r]);
+    expect(bySegment.size).toBeGreaterThan(0);
+    for (const rs of bySegment.values()) {
+      expect(rs.map((r) => r.side).sort()).toEqual(['L', 'R']);
+      const days = rs.map((r) => windowsOf(r).flatMap((w) => w.days).join());
+      expect(days[0]).not.toBe(days[1]);
+      for (const r of rs) expect(windowsOf(r).every((w) => w.days.length === 1 && !w.weeks_of_month)).toBe(true);
+    }
+  });
+
+  it('writes valid rows: right columns per layer, a permit code only if it names the side\'s own zone', () => {
+    for (const r of added) {
+      expect(r.type !== null, 'type').toBe(r.layer === 'restrictions');
+      expect(r.limit_minutes !== null, 'limit').toBe(r.layer === 'timed_parking');
+      expect(r.color_key !== null, 'color').toBe(r.layer === 'curb_color');
+      if (r.permit_code !== null) expect(permitCodeAt(byId.get(r.segment_id)!, permitZones, r.side)).toBe(r.permit_code);
+      if (r.layer === 'curb_color') expect(Object.keys(CURB_COLORS)).toContain(r.color_key);
+    }
+    expect(() => buildLayers(real, rows, 'burbank-sample')).not.toThrow();
+  });
+});
+
 // The committed sample set, checked against the TD-2 "Done when" conditions.
 describe('data/burbank-sample', () => {
   const root = resolve(import.meta.dirname, '..', '..', 'data');
@@ -487,9 +572,9 @@ describe('data/burbank-sample', () => {
     expect(sweeping.some((r) => windowsOf(r).some((w) => w.start === '08:30'))).toBe(true);
   });
 
-  it('leaves more blocks unmapped than mapped', () => {
+  it('maps the TD-2.2 target share of blocks (amended from "unmapped outnumber mapped")', () => {
     const mapped = new Set(rows.map((r) => r.segment_id)).size;
-    expect(mapped).toBeGreaterThan(0);
-    expect(mapped).toBeLessThan(real.features.length - mapped);
+    expect(mapped / real.features.length).toBeGreaterThanOrEqual(TARGET_MAPPED_SHARE);
+    expect(mapped).toBeLessThan(real.features.length); // still some blocks "not yet mapped"
   });
 });
