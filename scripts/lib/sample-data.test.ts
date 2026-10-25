@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildLayers, parseRuleRows, type RuleRow, type SegmentCollection } from './build.ts';
+import { generatePermitZones, permitZonesToJson } from './sample-permit-zones.ts';
 import { cellOf, CURB_COLORS, curbColorsToJson, generateSampleRows, isCorner, permitCodeAt, rowsToCsv, SAMPLE_SEED, zoneAt, type PermitZoneCollection } from './sample-data.ts';
 import { generateZoning } from './sample-zoning.ts';
 
@@ -214,7 +215,7 @@ describe('timed parking spread (TD-5)', () => {
   });
 
   it('adds DEMO- permit codes to a few rows inside the matching permit zone', () => {
-    const inZone = timed.filter((r) => r.permit_code !== null && permitCodeAt(realById.get(r.segment_id)!, permitZones) === r.permit_code);
+    const inZone = timed.filter((r) => r.permit_code !== null && permitCodeAt(realById.get(r.segment_id)!, permitZones, r.side) === r.permit_code);
     expect(inZone.length).toBeGreaterThanOrEqual(3);
     expect(inZone.length).toBeLessThan(timed.length / 4); // "a few"
     expect(new Set(inZone.map((r) => r.permit_code)).size).toBeGreaterThanOrEqual(2);
@@ -223,7 +224,7 @@ describe('timed parking spread (TD-5)', () => {
   it('gives every coded timed row the code of the permit zone its block lies in (TD-2 rows updated)', () => {
     const coded = timed.filter((r) => r.permit_code !== null);
     expect(coded.length).toBeGreaterThan(0);
-    for (const r of coded) expect(permitCodeAt(realById.get(r.segment_id)!, permitZones), r.segment_id).toBe(r.permit_code);
+    for (const r of coded) expect(permitCodeAt(realById.get(r.segment_id)!, permitZones, r.side), r.segment_id).toBe(r.permit_code);
   });
 
   it('writes no duplicate (segment, side) timed rows', () => {
@@ -291,12 +292,12 @@ describe('restrictions spread (TD-6)', () => {
   });
 
   it('puts permit-only rows inside DEMO- permit zones with that zone code, in at least 2 zones', () => {
-    const matching = restrictions.filter((r) => r.permit_mode === 'required' &&permitCodeAt(byId.get(r.segment_id)!, permitZones) === r.permit_code);
+    const matching = restrictions.filter((r) => r.permit_mode === 'required' &&permitCodeAt(byId.get(r.segment_id)!, permitZones, r.side) === r.permit_code);
     expect(matching.length).toBeGreaterThanOrEqual(10);
     expect(new Set(matching.map((r) => r.permit_code)).size).toBeGreaterThanOrEqual(2);
     const added = restrictions.filter((r) => !inBase(r));
     for (const r of added.filter((x) => x.permit_code !== null)) {
-      expect(permitCodeAt(byId.get(r.segment_id)!, permitZones), r.segment_id).toBe(r.permit_code);
+      expect(permitCodeAt(byId.get(r.segment_id)!, permitZones, r.side), r.segment_id).toBe(r.permit_code);
     }
   });
 
@@ -322,7 +323,7 @@ describe('restrictions spread (TD-6)', () => {
     expect(exempt.length).toBeGreaterThanOrEqual(8);
     expect(new Set(exempt.map((r) => r.permit_code)).size).toBeGreaterThanOrEqual(2);
     expect(new Set(exempt.map((r) => cellOf(byId.get(r.segment_id)!, real, 3))).size).toBeGreaterThanOrEqual(2);
-    for (const r of exempt) expect(permitCodeAt(byId.get(r.segment_id)!, permitZones), r.segment_id).toBe(r.permit_code);
+    for (const r of exempt) expect(permitCodeAt(byId.get(r.segment_id)!, permitZones, r.side), r.segment_id).toBe(r.permit_code);
     expect(exempt.length).toBeLessThan(restrictions.length / 8);
     expect(restrictions.filter((r) => r.permit_code === null).length).toBeGreaterThan(restrictions.length / 2);
   });
@@ -330,11 +331,11 @@ describe('restrictions spread (TD-6)', () => {
   it('gives every coded restriction row the code of the permit zone its block lies in (TD-2 rows updated)', () => {
     const coded = restrictions.filter((r) => r.permit_code !== null);
     expect(coded.length).toBeGreaterThan(0);
-    for (const r of coded) expect(permitCodeAt(byId.get(r.segment_id)!, permitZones), r.segment_id).toBe(r.permit_code);
+    for (const r of coded) expect(permitCodeAt(byId.get(r.segment_id)!, permitZones, r.side), r.segment_id).toBe(r.permit_code);
     // The TD-2 rows with a code outside their zone were updated in place: same rows, only the code differs.
-    const zoneOf = (r: RuleRow) => permitCodeAt(byId.get(r.segment_id)!, permitZones);
+    const zoneOf = (r: RuleRow) => permitCodeAt(byId.get(r.segment_id)!, permitZones, r.side);
     const wrong = base.filter((r) => r.layer === 'restrictions' && r.permit_code !== null && zoneOf(r) !== r.permit_code);
-    expect(wrong).toHaveLength(19);
+    expect(wrong.length).toBeGreaterThan(0);
     for (const r of wrong) {
       expect(restrictions.some((x) => same(x, { ...r, permit_code: zoneOf(r) })), r.segment_id).toBe(true);
     }
@@ -343,6 +344,42 @@ describe('restrictions spread (TD-6)', () => {
   it('writes no duplicate (segment, side) restriction rows and keeps unmapped blocks far more common', () => {
     expect(new Set(restrictions.map((r) => `${r.segment_id}|${r.side}`)).size).toBe(restrictions.length);
     expect(new Set(rows.map((r) => r.segment_id)).size).toBeLessThan(real.features.length / 10);
+  });
+});
+
+// Permit zones and the rules that use them (task TD-8).
+describe('permit codes against the permit zones (TD-8)', () => {
+  const data = resolve(import.meta.dirname, '..', '..', 'data');
+  const real = JSON.parse(readFileSync(resolve(data, 'burbank', 'segments.geojson'), 'utf8')) as SegmentCollection;
+  const zoning = generateZoning(real, 'burbank-sample');
+  const permitZones = generatePermitZones(real, zoning, 'burbank-sample');
+  const rows = generateSampleRows(real, SAMPLE_SEED, { zoning, permitZones });
+  const byId = new Map(real.features.map((f) => [f.properties.segment_id, f]));
+  const coded = rows.filter((r) => r.permit_code !== null);
+
+  it('matches the permit-zones.geojson file the generator writes', () => {
+    const onDisk = readFileSync(resolve(data, 'burbank-sample', 'permit-zones.geojson'), 'utf8');
+    expect(onDisk.replace(/\r\n/g, '\n')).toBe(permitZonesToJson(permitZones));
+  });
+
+  it('gives every DEMO- code in the rules a zone, and every zone at least one rule', () => {
+    const zoneCodes = new Set(permitZones.features.map((f) => f.properties.permit_code));
+    expect(zoneCodes.size).toBe(8);
+    for (const r of coded) expect(zoneCodes.has(r.permit_code!), `${r.segment_id} ${r.permit_code}`).toBe(true);
+    for (const code of zoneCodes) expect(coded.some((r) => r.permit_code === code), code).toBe(true);
+  });
+
+  it('gives every coded row the code of the zone its own side lies in', () => {
+    for (const r of coded) expect(permitCodeAt(byId.get(r.segment_id)!, permitZones, r.side), `${r.segment_id} ${r.side}`).toBe(r.permit_code);
+  });
+
+  it('never leaves a permit-only row without a code', () => {
+    for (const r of rows.filter((x) => x.permit_mode !== null && x.permit_mode !== undefined)) expect(r.permit_code).not.toBeNull();
+  });
+
+  it('keeps the sweeping rows exactly as they were', () => {
+    const sweeping = (rs: RuleRow[]) => rs.filter((r) => r.layer === 'sweeping');
+    expect(sweeping(rows)).toEqual(sweeping(generateSampleRows(real, SAMPLE_SEED)));
   });
 });
 

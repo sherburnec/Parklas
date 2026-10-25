@@ -1,5 +1,6 @@
 // Write data/burbank-sample/rules.csv (made-up rules on about 1 in 15 Burbank segments, task TD-2)
-// zoning.geojson + zoning-categories.json (SAMPLE- zones tiling the whole city, task TD-3)
+// zoning.geojson + zoning-categories.json (SAMPLE- zones tiling the whole city, task TD-3),
+// permit-zones.geojson (8 DEMO- permit zones grown from city blocks, task TD-8)
 // and curb-colors.json (the five sample curb colors, task TD-7).
 //
 //   npm run generate:sample
@@ -10,14 +11,17 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SegmentCollection } from './lib/build.ts';
-import { CURB_COLORS, curbColorsToJson, generateSampleRows, rowsToCsv, SAMPLE_SEED, type PermitZoneCollection } from './lib/sample-data.ts';
+import { CURB_COLORS, curbColorsToJson, generateSampleRows, rowsToCsv, SAMPLE_SEED } from './lib/sample-data.ts';
+import { generatePermitZones, permitZonesToJson } from './lib/sample-permit-zones.ts';
 import { generateZoning, zoningConfig, zoningToJson } from './lib/sample-zoning.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const segments = JSON.parse(readFileSync(resolve(root, 'data', 'burbank', 'segments.geojson'), 'utf8')) as SegmentCollection;
 
 const zoning = generateZoning(segments, 'burbank-sample');
-const permitZones = JSON.parse(readFileSync(resolve(root, 'data', 'burbank-sample', 'permit-zones.geojson'), 'utf8')) as PermitZoneCollection;
+const permitZones = generatePermitZones(segments, zoning, 'burbank-sample');
+writeFileSync(resolve(root, 'data', 'burbank-sample', 'permit-zones.geojson'), permitZonesToJson(permitZones));
+console.log(`burbank-sample/permit-zones.geojson: ${permitZones.features.length} zones`);
 
 const rows = generateSampleRows(segments, SAMPLE_SEED, { zoning, permitZones });
 writeFileSync(resolve(root, 'data', 'burbank-sample', 'rules.csv'), rowsToCsv(rows));

@@ -205,10 +205,42 @@ export function zoneAt(segment: Segment, zoning: ZoningCollection): ZoningCollec
   return zoning.features.find((z) => inRing(x, y, z.geometry.coordinates[0]));
 }
 
-/** The permit code of the permit zone holding a segment's middle point, if any. */
-export function permitCodeAt(segment: Segment, permitZones: PermitZoneCollection): string | null {
-  const [x, y] = middleOf(segment);
+const SIDE_OFFSET_M = 4;
+const M_PER_DEG_X = 92000; // Burbank's latitude
+const M_PER_DEG_Y = 111000;
+
+/**
+ * A point just off the middle of a segment (by length), toward one side. L is to the left when facing from the first
+ * to the last coordinate. Zone borders run along street lines, so a side is tested here, not the street itself.
+ */
+export function sidePoint(segment: Segment, side: Side): [number, number] {
+  const c = segment.geometry.coordinates;
+  const lengths = c.slice(1).map((p, i) => Math.hypot((p[0] - c[i][0]) * M_PER_DEG_X, (p[1] - c[i][1]) * M_PER_DEG_Y));
+  let left = lengths.reduce((a, b) => a + b, 0) / 2;
+  let i = 0;
+  while (i < lengths.length - 1 && left > lengths[i]) left -= lengths[i++];
+  const t = lengths[i] === 0 ? 0 : left / lengths[i];
+  const [x0, y0] = c[i];
+  const [x1, y1] = c[i + 1];
+  const dx = (x1 - x0) * M_PER_DEG_X;
+  const dy = (y1 - y0) * M_PER_DEG_Y;
+  const len = Math.hypot(dx, dy) || 1;
+  const sign = side === 'L' ? 1 : -1;
+  return [
+    x0 + (x1 - x0) * t + (sign * (-dy / len) * SIDE_OFFSET_M) / M_PER_DEG_X,
+    y0 + (y1 - y0) * t + (sign * (dx / len) * SIDE_OFFSET_M) / M_PER_DEG_Y,
+  ];
+}
+
+/** The permit code of the permit zone holding one side of a segment, if any. */
+export function permitCodeAt(segment: Segment, permitZones: PermitZoneCollection, side: Side): string | null {
+  const [x, y] = sidePoint(segment, side);
   return permitZones.features.find((z) => inRing(x, y, z.geometry.coordinates[0]))?.properties.permit_code ?? null;
+}
+
+/** The zone code of either side of a segment (L first), if any: whether the block touches a permit zone at all. */
+export function anyPermitCodeAt(segment: Segment, permitZones: PermitZoneCollection): string | null {
+  return permitCodeAt(segment, permitZones, 'L') ?? permitCodeAt(segment, permitZones, 'R');
 }
 
 // Timed parking spread (task TD-5). Limits cycle through this list, so every one lands in several parts of the city;
@@ -245,7 +277,8 @@ function spreadTimedParking(rows: RuleRow[], segments: SegmentCollection, ctx: S
     if (r.layer === 'timed_parking') timedSides.set(r.segment_id, new Set([...(timedSides.get(r.segment_id) ?? []), r.side]));
     if (r.layer === 'sweeping') sweptSides.set(r.segment_id, [...(sweptSides.get(r.segment_id) ?? []), r.side]);
   }
-  const permitOf = (id: string) => permitCodeAt(byId.get(id)!, ctx.permitZones);
+  const permitOf = (id: string) => anyPermitCodeAt(byId.get(id)!, ctx.permitZones); // does the block touch a zone at all
+  const sidePermit = (id: string, side: Side) => permitCodeAt(byId.get(id)!, ctx.permitZones, side);
 
   let n = 0;
   const out: RuleRow[] = [];
@@ -256,7 +289,7 @@ function spreadTimedParking(rows: RuleRow[], segments: SegmentCollection, ctx: S
     const own = (rowsOf.get(id) ?? []).map((r) => {
       // Existing timed rows inside a permit zone also get the zone's code now and then.
       const permit = r.layer === 'timed_parking' && r.permit_code === null ? permitOf(id) : null;
-      return permit && chance(PERMIT_ON_ROW, rng) ? { ...r, permit_code: permit } : r;
+      return permit && chance(PERMIT_ON_ROW, rng) ? { ...r, permit_code: sidePermit(id, r.side) } : r;
     });
     out.push(...own);
     if (timedSides.has(id)) continue;
@@ -271,7 +304,7 @@ function spreadTimedParking(rows: RuleRow[], segments: SegmentCollection, ctx: S
     out.push({
       segment_id: id, side, layer: 'timed_parking', type: null, color_key: null,
       limit_minutes: SPREAD_LIMITS[n++ % SPREAD_LIMITS.length],
-      permit_code: permit && chance(PERMIT_ON_ROW, rng) ? permit : null,
+      permit_code: permit && chance(PERMIT_ON_ROW, rng) ? sidePermit(id, side) : null,
       schedule: spreadSchedule(rng),
     });
   }
@@ -342,10 +375,17 @@ function spreadRestrictions(rows: RuleRow[], segments: SegmentCollection, ctx: S
   for (const segment of segments.features) {
     const id = segment.properties.segment_id;
     const k = mapped.has(id) ? 0 : 1;
-    const permit = permitCodeAt(segment, ctx.permitZones);
+    const permit = anyPermitCodeAt(segment, ctx.permitZones);
     const corner = isCorner(segment, segments);
     let side: Side | null;
-    if (permit && chance(ADD_PERMIT_ONLY[k], rng) && (side = freeSide(id))) add(id, side, 'no_parking', permit, restrictionSchedule('no_parking', rng));
+    // A permit-only row needs a side that lies in a zone, and takes that zone's code.
+    if (permit && chance(ADD_PERMIT_ONLY[k], rng)) {
+      const inZone = SIDES.filter((s) => !taken.has(`${id}|${s}`) && permitCodeAt(segment, ctx.permitZones, s) !== null);
+      if (inZone.length > 0) {
+        side = pick(inZone, rng);
+        add(id, side, 'no_parking', permitCodeAt(segment, ctx.permitZones, side), restrictionSchedule('no_parking', rng));
+      }
+    }
     if (corner && chance(ADD_NO_STOPPING[k], rng) && (side = freeSide(id))) add(id, side, 'no_stopping', null, restrictionSchedule('no_stopping', rng));
     if (chance(ADD_ANY_TIME[k], rng) && (side = freeSide(id))) add(id, side, 'no_parking', null, null);
     if (chance(ADD_NO_STANDING[k], rng) && (side = freeSide(id))) add(id, side, 'no_standing', null, restrictionSchedule('no_standing', rng));
@@ -361,14 +401,14 @@ function spreadRestrictions(rows: RuleRow[], segments: SegmentCollection, ctx: S
 
 /**
  * TD-2 gave restriction and timed parking rows a random DEMO- code whatever zone the block was in. Now a code is the
- * code of the zone its block lies in: a row in another zone takes that zone's code, a row outside every zone loses it.
- * A plain lookup with no generator, so no other row moves.
+ * code of the zone its side lies in (task TD-8): a row in another zone takes that zone's code, a row outside every zone
+ * loses it. A plain lookup with no generator, so no other row moves.
  */
 function alignPermitCodes(rows: RuleRow[], segments: SegmentCollection, ctx: SampleContext): RuleRow[] {
   const byId = new Map(segments.features.map((f) => [f.properties.segment_id, f]));
   return rows.map((r) => {
     if (r.permit_code === null) return r;
-    const zone = permitCodeAt(byId.get(r.segment_id)!, ctx.permitZones);
+    const zone = permitCodeAt(byId.get(r.segment_id)!, ctx.permitZones, r.side);
     return zone === r.permit_code ? r : { ...r, permit_code: zone };
   });
 }
@@ -393,14 +433,39 @@ function spreadExemptions(rows: RuleRow[], segments: SegmentCollection, ctx: Sam
   const added: RuleRow[] = [];
   for (const segment of segments.features) {
     const id = segment.properties.segment_id;
-    const permit = permitCodeAt(segment, ctx.permitZones);
-    if (!permit || !chance(ADD_EXEMPT[mapped.has(id) ? 0 : 1], rng)) continue;
-    const free = SIDES.filter((s) => !taken.has(`${id}|${s}`));
+    if (!anyPermitCodeAt(segment, ctx.permitZones) || !chance(ADD_EXEMPT[mapped.has(id) ? 0 : 1], rng)) continue;
+    const free = SIDES.filter((s) => !taken.has(`${id}|${s}`) && permitCodeAt(segment, ctx.permitZones, s) !== null);
     if (free.length === 0) continue;
     const side = free.find((s) => timed.has(`${id}|${s}`)) ?? pick(free, rng);
     added.push({
-      segment_id: id, side, layer: 'restrictions', type: 'no_parking', limit_minutes: null, permit_code: permit, permit_mode: 'exempt', color_key: null,
+      segment_id: id, side, layer: 'restrictions', type: 'no_parking', limit_minutes: null, permit_code: permitCodeAt(segment, ctx.permitZones, side), permit_mode: 'exempt', color_key: null,
       schedule: win(WEEKDAYS, '07:00', '09:00'),
+    });
+  }
+  return [...rows, ...added];
+}
+
+/**
+ * Every zone needs at least one rule (task TD-8). A zone that the spreads above left without a coded row gets one
+ * permit-only no-parking row on a free side inside it. Own generator, appended last, so no other row moves.
+ */
+function ensureEveryZoneHasRule(rows: RuleRow[], segments: SegmentCollection, ctx: SampleContext, seed: number): RuleRow[] {
+  const rng = mulberry32((seed ^ 0x5a4f4e52) >>> 0);
+  const coded = new Set(rows.map((r) => r.permit_code));
+  const taken = new Set(rows.filter((r) => r.layer === 'restrictions').map((r) => `${r.segment_id}|${r.side}`));
+  const added: RuleRow[] = [];
+  for (const zone of ctx.permitZones.features) {
+    const code = zone.properties.permit_code;
+    if (coded.has(code)) continue;
+    const options = segments.features.flatMap((s) =>
+      SIDES.filter((side) => permitCodeAt(s, ctx.permitZones, side) === code && !taken.has(`${s.properties.segment_id}|${side}`)).map((side) => ({ id: s.properties.segment_id, side })),
+    );
+    if (options.length === 0) throw new Error(`Permit zone ${code} has no free street side for a rule`);
+    const { id, side } = pick(options, rng);
+    taken.add(`${id}|${side}`);
+    added.push({
+      segment_id: id, side, layer: 'restrictions', type: 'no_parking', limit_minutes: null, permit_code: code, permit_mode: 'required', color_key: null,
+      schedule: restrictionSchedule('no_parking', rng),
     });
   }
   return [...rows, ...added];
@@ -491,7 +556,7 @@ export function generateSampleRows(segments: SegmentCollection, seed: number, co
   }
   if (!context) return rows;
   const restricted = spreadRestrictions(spreadTimedParking(alignPermitCodes(rows, segments, context), segments, context, seed), segments, context, seed);
-  return spreadCurbColors(spreadExemptions(restricted, segments, context, seed), segments, seed);
+  return spreadCurbColors(ensureEveryZoneHasRule(spreadExemptions(restricted, segments, context, seed), segments, context, seed), segments, seed);
 }
 
 const HEADER = 'segment_id,side,layer,type,limit_minutes,permit_code,permit_mode,color_key,schedule';

@@ -1,6 +1,6 @@
 import { createBasemap } from './basemap';
 import { bannerText, getDataSet, loadCity } from './data-loader';
-import { drawCurbColors, drawNoStopping, drawRestrictions, drawSweeping, drawTimedParking, drawZoning } from './layers';
+import { drawCurbColors, drawNoStopping, drawPermitZones, drawRestrictions, drawSweeping, drawTimedParking, drawZoning } from './layers';
 import type { TimeSelection } from './layers';
 
 const CITY_ID = 'burbank';
@@ -25,6 +25,11 @@ loadCity(CITY_ID)
     const { zoning, zoningCategories } = city;
     if (zoning && zoningCategories) {
       void basemap.ready.then(() => drawZoning(basemap.map, zoning, zoningCategories, basemap.underStreetsLayerId, app));
+    }
+    const { permitZones } = city;
+    if (permitZones) {
+      // After zoning, so the permit zones sit above it; both stay under the street lines and every band.
+      void basemap.ready.then(() => drawPermitZones(basemap.map, permitZones, basemap.underStreetsLayerId, app));
     }
     void basemap.ready.then(() =>
       drawSweeping(basemap.map, city.sweeping, city.trim, SELECTED, city.city.time_zone, basemap.underLabelsLayerId),
