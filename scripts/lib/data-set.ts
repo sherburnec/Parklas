@@ -55,6 +55,11 @@ export function loadCityFiles(dataDir: string, city: string): Record<string, str
     const path = resolve(dataDir, source, 'trim.json');
     if (existsSync(path)) files['trim.json'] = readFileSync(path, 'utf8');
   }
+  // blocks.csv (task M5-5) is borrowed the same way; a city may have none.
+  if (source !== null && !('blocks.csv' in files)) {
+    const path = resolve(dataDir, source, 'blocks.csv');
+    if (existsSync(path)) files['blocks.csv'] = readFileSync(path, 'utf8');
+  }
   return files;
 }
 

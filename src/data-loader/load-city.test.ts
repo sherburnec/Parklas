@@ -59,6 +59,15 @@ describe('loadCity', () => {
     await expect(loadCity('burbank', { dataSet: 'real', baseUrl: '/data', fetcher: fakeFetcher(files) })).rejects.toThrow(/burbank\/metadata\.json.*404/);
   });
 
+  it('reads blocks.json when the city has one, and returns null when it does not (task M5-5)', async () => {
+    const without = await loadCity('burbank', { dataSet: 'real', baseUrl: '/data', fetcher: fakeFetcher(required('burbank')) });
+    expect(without.blocks).toBeNull();
+    const blocks = { city_id: 'burbank', blocks: { a: 1200, b: null } };
+    const files = { ...required('burbank'), '/data/burbank/blocks.json': blocks };
+    const withBlocks = await loadCity('burbank', { dataSet: 'real', baseUrl: '/data', fetcher: fakeFetcher(files) });
+    expect(withBlocks.blocks).toEqual(blocks);
+  });
+
   it('treats an HTML answer for an optional file as absent', async () => {
     const fetcher: Fetcher = async (url) =>
       url.endsWith('zoning.geojson') ? new Response('<html>', { status: 200 }) : fakeFetcher(required('burbank'))(url);

@@ -5,7 +5,7 @@ import type { CurbColorsConfig, SegmentCollection, SideCollection, TrimData } fr
 import type { Weekday } from '../schedule-engine';
 import { describeSegment, type DetailData } from './detail';
 import { gridSide } from './grid';
-import { scheduleText } from './format';
+import { blockHeading, scheduleText } from './format';
 
 const ZONE = 'America/Los_Angeles';
 // The data files as text, through Vite, so this test needs no Node types.
@@ -32,6 +32,7 @@ const data: DetailData = {
   coverage: built.coverage,
   trim: JSON.parse(read('burbank', 'trim.json')) as TrimData,
   curbColorConfig: JSON.parse(read('burbank-sample', 'curb-colors.json')) as CurbColorsConfig,
+  blocks: null,
 };
 
 describe('scheduleText', () => {
@@ -76,6 +77,47 @@ describe('gridSide', () => {
   });
   it('gives opposite sides different labels for any direction', () => {
     for (let b = 0; b < 360; b += 7) expect(gridSide(line(b), 'L')).not.toBe(gridSide(line(b), 'R'));
+  });
+});
+
+describe('block heading (task M5-5)', () => {
+  const id = 'burbank-1790974706-1790974762';
+  const at = { day: 'mon', hour: 8 } as const;
+
+  it('reads "<number> block of <street>" when the block has a number', () => {
+    const withNumber: DetailData = { ...data, blocks: { city_id: 'burbank', blocks: { [id]: 1200 } } };
+    const view = describeSegment(withNumber, id, at, ZONE);
+    expect(view.blockNumber).toBe(1200);
+    expect(view.heading).toBe('1200 block of Winona Avenue');
+    // The cross streets line is unchanged.
+    expect(view.fromStreet).toBe('North Reese Place');
+    expect(view.toStreet).toBe('North Orchard Drive');
+  });
+
+  it('writes block number 0 as "0 block of", since 0 is a real block number', () => {
+    expect(blockHeading('Main Street', 0)).toBe('0 block of Main Street');
+  });
+
+  it('gives the street name and "block number not recorded" when the row has no number', () => {
+    const empty: DetailData = { ...data, blocks: { city_id: 'burbank', blocks: { [id]: null } } };
+    const view = describeSegment(empty, id, at, ZONE);
+    expect(view.blockNumber).toBeNull();
+    expect(view.heading).toBe('Winona Avenue, block number not recorded');
+  });
+
+  it('does the same when the segment is missing from the file, or the city has no blocks file at all', () => {
+    const missing: DetailData = { ...data, blocks: { city_id: 'burbank', blocks: {} } };
+    expect(describeSegment(missing, id, at, ZONE).heading).toBe('Winona Avenue, block number not recorded');
+    expect(describeSegment(data, id, at, ZONE).heading).toBe('Winona Avenue, block number not recorded');
+  });
+
+  it('applies to an unmapped block too', () => {
+    const unmapped = data.segments.features.find((f) => !data.coverage.segment_ids.includes(f.properties.segment_id))!;
+    const sid = unmapped.properties.segment_id;
+    const numbered: DetailData = { ...data, blocks: { city_id: 'burbank', blocks: { [sid]: 300 } } };
+    const view = describeSegment(numbered, sid, at, ZONE);
+    expect(view.mapped).toBe(false);
+    expect(view.heading).toBe(`300 block of ${unmapped.properties.street}`);
   });
 });
 

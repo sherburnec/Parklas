@@ -4,6 +4,11 @@ import type { Schedule, Weekday } from '../schedule-engine';
 const ORDER: Weekday[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const SHORT: Record<Weekday, string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
 
+/** "1200 block of West Olive Avenue", or the street with "block number not recorded" when there is no number. */
+export function blockHeading(street: string, blockNumber: number | null): string {
+  return blockNumber === null ? `${street}, block number not recorded` : `${blockNumber} block of ${street}`;
+}
+
 export const dayName = (day: Weekday): string => SHORT[day];
 
 /** Runs of three or more consecutive days read as a range ("Mon–Fri"); shorter runs are listed ("Fri, Sat"). */

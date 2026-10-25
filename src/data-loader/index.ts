@@ -2,6 +2,7 @@ export { bannerText, dataFolder, getDataSet, resolveDataSet, SAMPLE_BANNER_TEXT 
 export type { DataSet } from './data-set';
 export { loadCity } from './load-city';
 export type {
+  BlockNumbers,
   CityConfig,
   CityData,
   CityMetadata,

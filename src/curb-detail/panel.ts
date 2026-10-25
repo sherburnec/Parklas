@@ -57,7 +57,7 @@ function render(view: SegmentView, at: DetailTime, unmappedMessage: string, onCl
   close.type = 'button';
   close.addEventListener('click', onClose);
   root.append(close);
-  root.append(el('h2', view.street));
+  root.append(el('h2', view.heading));
   root.append(el('p', `Between ${view.fromStreet} and ${view.toStreet}`));
   if (!view.mapped) {
     root.append(el('p', unmappedMessage, 'curb-unmapped'));

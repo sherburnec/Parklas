@@ -5,11 +5,11 @@ import { instantFor, isActive, localParts, nextChange } from '../schedule-engine
 import type { Schedule, Weekday } from '../schedule-engine';
 import { gridSide } from './grid';
 import type { GridSide } from './grid';
-import { scheduleText, statusText } from './format';
+import { blockHeading, scheduleText, statusText } from './format';
 
 export type DetailData = Pick<
   CityData,
-  'segments' | 'sweeping' | 'timedParking' | 'restrictions' | 'curbColors' | 'coverage' | 'trim' | 'curbColorConfig'
+  'segments' | 'sweeping' | 'timedParking' | 'restrictions' | 'curbColors' | 'coverage' | 'trim' | 'curbColorConfig' | 'blocks'
 >;
 
 /** The chosen day and hour, from the shared state. */
@@ -47,6 +47,10 @@ export interface SideView {
 export interface SegmentView {
   segmentId: string;
   street: string;
+  /** The recorded block number, null when not recorded. */
+  blockNumber: number | null;
+  /** "1200 block of West Olive Avenue", or the street and "block number not recorded". */
+  heading: string;
   fromStreet: string;
   toStreet: string;
   mapped: boolean;
@@ -164,9 +168,13 @@ export function describeSegment(data: DetailData, segmentId: string, at: DetailT
     };
   });
 
+  const street = String(props.street ?? '');
+  const blockNumber = data.blocks?.blocks[segmentId] ?? null;
   return {
     segmentId,
-    street: String(props.street ?? ''),
+    street,
+    blockNumber,
+    heading: blockHeading(street, blockNumber),
     fromStreet: String(props.from_street ?? ''),
     toStreet: String(props.to_street ?? ''),
     mapped: data.coverage.segment_ids.includes(segmentId),

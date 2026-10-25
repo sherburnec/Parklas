@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parklas.local/schemas/block-row.schema.json",
+  "title": "blocks.csv row",
+  "description": "One row of blocks.csv, after the validator parses the cells: empty cells become null and numbers become integers. Ties a segment to a real address range, for the heading in the curb detail panel.",
+  "type": "object",
+  "required": ["segment_id", "source"],
+  "additionalProperties": false,
+  "properties": {
+    "segment_id": { "type": "string", "minLength": 1 },
+    "block_number": { "type": ["integer", "null"], "minimum": 0, "multipleOf": 100, "description": "The hundred, such as 1200 for the 1200 block. Empty when not known." },
+    "low_address": { "type": ["integer", "null"], "minimum": 0, "description": "Smallest house number found on the block." },
+    "high_address": { "type": ["integer", "null"], "minimum": 0, "description": "Largest house number found on the block." },
+    "source": { "enum": ["osm", "manual"], "description": "osm: written by the extraction script. manual: typed by hand and never overwritten by the script." }
+  }
+}

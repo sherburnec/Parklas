@@ -41,6 +41,21 @@ Never edit `segments.geojson`. It is the street list and must not change. Every 
 - **A block under 20 m is drawn only if it has a rule row.** Short connecting blocks between two roads are left off the map unless you give them a rule. Their rows still work as normal.
 - **Inner-facing sides are not drawn on the map, but they still appear in the click-through list.** Where two roads run side by side, such as the two halves of a divided road, the sides that face each other are skipped because the bands would cross. Write their rows as you would for any other side.
 
+## Block numbers: blocks.csv
+
+The click-through panel heads a block "1200 block of West Olive Avenue" when it knows the number, and otherwise shows the street name with "block number not recorded". The numbers live in `data/<city_id>/blocks.csv`, never in `segments.geojson`. The file is optional: a city without it still loads.
+
+| Column | Meaning |
+| --- | --- |
+| `segment_id` | A block from `segments.geojson`. One row per block. |
+| `block_number` | The hundred, such as `1200`. Empty when not known. Must be a multiple of 100. |
+| `low_address`, `high_address` | Smallest and largest house number found on the block. Optional on a hand-typed row. |
+| `source` | `osm` or `manual` (below). |
+
+`node scripts/extract-block-numbers.ts` is a one-off, like the segment extraction. It asks OpenStreetMap for house numbers, gives each to the nearest block of the same street within 40 m, and numbers a block only when it found at least 2 addresses, all in the same hundred. It never guesses: every other block is written with an empty `block_number` and listed in `blocks-report.md`, which is your to-do list. OpenStreetMap has few Burbank addresses, so expect most blocks on that list.
+
+To fill a gap from the report, find the block's row in `blocks.csv`, type the `block_number` (for example `1200`) and set `source` to `manual`. **`manual` means a person set this row: re-running the script never overwrites it.** A row left as `osm` is replaced on the next run. `validate` checks that every `segment_id` exists and appears once, that `block_number` is empty or a multiple of 100, and that `low_address` is not above `high_address`; it warns about a block with no row. `build:data` turns the file into `blocks.json` for the page. A sample folder uses its source city's `blocks.csv`.
+
 ## Authoring page: find a segment_id and its sides
 
 The authoring page is a separate map for data entry. The public page does not link to it.

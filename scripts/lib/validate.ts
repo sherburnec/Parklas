@@ -24,6 +24,8 @@ const SCHEMA_BY_FILE: Record<string, string> = {
 
 const RULE_COLUMNS = ['segment_id', 'city_id', 'side', 'layer', 'type', 'limit_minutes', 'permit_code', 'permit_mode', 'color_key', 'schedule'];
 const REQUIRED_COLUMNS = ['segment_id', 'side', 'layer'];
+const BLOCKS_FILE = 'blocks.csv';
+export const BLOCK_COLUMNS = ['segment_id', 'block_number', 'low_address', 'high_address', 'source'];
 
 // RFC 4180: quoted cells may hold commas, doubled quotes and newlines (schedule cells are JSON text).
 export function parseCsv(text: string): string[][] {
@@ -281,10 +283,53 @@ export function validateCity(files: Record<string, string>, schemas: object[]): 
     });
   }
 
+  // blocks.csv (task M5-5): optional, and not a rules file.
+  if (BLOCKS_FILE in files) {
+    const rows = parseCsv(files[BLOCKS_FILE]);
+    const header = (rows[0] ?? []).map((h) => h.trim());
+    const unknown = header.filter((h) => !BLOCK_COLUMNS.includes(h));
+    const missing = BLOCK_COLUMNS.filter((h) => !header.includes(h));
+    for (const h of unknown) add(BLOCKS_FILE, 1, `Unknown column "${h}" (allowed: ${BLOCK_COLUMNS.join(', ')})`);
+    for (const h of missing) add(BLOCKS_FILE, 1, `The header is missing the column "${h}"`);
+    if (rows.length === 0) add(BLOCKS_FILE, null, 'The file is empty (it needs a header row)');
+    if (rows.length > 0 && !unknown.length && !missing.length) {
+      const validateBlock = validator('block-row');
+      const firstRow = new Map<string, number>();
+      rows.slice(1).forEach((cells, i) => {
+        const n = i + 2;
+        if (cells.length === 1 && cells[0].trim() === '') return;
+        if (cells.length !== header.length) {
+          add(BLOCKS_FILE, n, `Row has ${cells.length} cells but the header has ${header.length}`);
+          return;
+        }
+        const rec: Record<string, unknown> = {};
+        header.forEach((h, c) => {
+          const v = cells[c].trim();
+          rec[h] = v === '' ? null : h === 'segment_id' || h === 'source' ? v : /^-?\d+$/.test(v) ? Number(v) : v;
+        });
+        if (!validateBlock(rec)) for (const reason of explain(validateBlock.errors ?? [])) add(BLOCKS_FILE, n, reason);
+        const id = rec.segment_id;
+        if (typeof id === 'string') {
+          if (!segmentIds.has(id)) add(BLOCKS_FILE, n, `segment_id "${id}" is not in segments.geojson`);
+          const first = firstRow.get(id);
+          if (first !== undefined) add(BLOCKS_FILE, n, `segment_id "${id}" appears twice (first on row ${first}); each block needs one row`);
+          else firstRow.set(id, n);
+        }
+        if (typeof rec.low_address === 'number' && typeof rec.high_address === 'number' && rec.low_address > rec.high_address) {
+          add(BLOCKS_FILE, n, `low_address ${rec.low_address} is above high_address ${rec.high_address}`);
+        }
+      });
+      const noRow = [...segmentIds].filter((id) => !firstRow.has(id));
+      if (noRow.length) {
+        add(BLOCKS_FILE, null, `${noRow.length} segment${noRow.length === 1 ? ' has' : 's have'} no row (first: "${noRow[0]}"); add one, with an empty block_number if it is not known`, 'warning');
+      }
+    }
+  }
+
   // Rule CSVs.
   const validateRow = validator('rule-row');
   for (const [file, text] of Object.entries(files)) {
-    if (!file.endsWith('.csv')) continue;
+    if (!file.endsWith('.csv') || file === BLOCKS_FILE) continue;
     const rows = parseCsv(text);
     if (rows.length === 0) {
       add(file, null, 'The file is empty (it needs a header row)');

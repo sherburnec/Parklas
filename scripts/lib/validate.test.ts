@@ -491,3 +491,69 @@ describe('permit zone checks (task M2-9)', () => {
     expect(warningsOf(permitCity([]))).toEqual([]);
   });
 });
+
+describe('blocks.csv checks (task M5-5)', () => {
+  const BLOCK_HEADER = 'segment_id,block_number,low_address,high_address,source';
+  const withBlocks = (...lines: string[]) => ({ ...goodCity(), 'blocks.csv': [BLOCK_HEADER, ...lines].join('\n') });
+
+  it('accepts a good blocks.csv, and a city without one', () => {
+    expect(validateCity(withBlocks('seg-1,1200,1204,1230,osm'), schemas)).toEqual([]);
+    expect(validateCity(goodCity(), schemas)).toEqual([]);
+  });
+
+  it('accepts an empty block_number', () => {
+    expect(validateCity(withBlocks('seg-1,,,,osm'), schemas)).toEqual([]);
+  });
+
+  it('is not read as a rules file', () => {
+    const problems = validateCity(withBlocks('seg-1,1200,1204,1230,osm'), schemas);
+    expect(problems.filter((p) => p.file === 'blocks.csv')).toEqual([]);
+  });
+
+  it('rejects a segment_id that is not in segments.geojson, with the row number', () => {
+    const problems = validateCity(withBlocks('seg-1,1200,1204,1230,osm', 'nope,100,101,150,osm'), schemas);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatchObject({ file: 'blocks.csv', row: 3, severity: 'error' });
+    expect(problems[0].reason).toContain('nope');
+  });
+
+  it('rejects a block_number that is not a non-negative multiple of 100', () => {
+    for (const bad of ['1250', '-100', '12.5', 'abc']) {
+      const problems = validateCity(withBlocks(`seg-1,${bad},,,manual`), schemas);
+      expect(problems.some((p) => p.file === 'blocks.csv' && p.row === 2 && p.severity === 'error'), bad).toBe(true);
+    }
+    expect(validateCity(withBlocks('seg-1,0,,,manual'), schemas)).toEqual([]);
+  });
+
+  it('rejects low_address above high_address', () => {
+    const problems = validateCity(withBlocks('seg-1,1200,1230,1204,osm'), schemas);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatchObject({ file: 'blocks.csv', row: 2, severity: 'error' });
+    expect(problems[0].reason).toContain('low_address');
+  });
+
+  it('rejects a duplicate segment_id, naming the first row', () => {
+    const problems = validateCity(withBlocks('seg-1,1200,,,osm', 'seg-1,1300,,,manual'), schemas);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatchObject({ file: 'blocks.csv', row: 3, severity: 'error' });
+    expect(problems[0].reason).toContain('row 2');
+  });
+
+  it('rejects an unknown source and an unknown column', () => {
+    expect(validateCity(withBlocks('seg-1,1200,,,guess'), schemas).some((p) => p.row === 2 && p.severity === 'error')).toBe(true);
+    const files = { ...goodCity(), 'blocks.csv': `${BLOCK_HEADER},extra\nseg-1,1200,,,osm,x` };
+    expect(validateCity(files, schemas).some((p) => p.file === 'blocks.csv' && p.reason.includes('extra'))).toBe(true);
+  });
+
+  it('warns, without failing, on a segment that has no row', () => {
+    const files = goodCity();
+    const segs = JSON.parse(files['segments.geojson']);
+    segs.features.push({ ...segs.features[0], properties: { ...segs.features[0].properties, segment_id: 'seg-2' } });
+    files['segments.geojson'] = JSON.stringify(segs);
+    files['blocks.csv'] = `${BLOCK_HEADER}\nseg-1,1200,1204,1230,osm`;
+    const problems = validateCity(files, schemas);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatchObject({ file: 'blocks.csv', severity: 'warning' });
+    expect(problems[0].reason).toContain('seg-2');
+  });
+});

@@ -7,10 +7,12 @@
 // Runs the validator first and stops without writing anything if it finds a problem.
 // Output goes to public/data/<city_id>/. A real city folder also gets data/<city_id>/trim.json written (task M2-8):
 // the band geometry flags, computed from its frozen segments.geojson. A sample folder borrows the source city's.
+// A folder with a blocks.csv also gets blocks.json (task M5-5); a sample folder borrows the source city's blocks.csv.
 // Every folder also gets public/data/<city_id>/metadata.json with its last-updated date (task M5-2).
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildBlocks, parseBlockRows } from './lib/blocks.ts';
 import { buildLayers, parseRuleRows, type SegmentCollection } from './lib/build.ts';
 import { citiesToProcess, loadCityFiles, parseDataSet, passThroughFiles, sourceCityOf } from './lib/data-set.ts';
 import { buildMetadata } from './lib/metadata.ts';
@@ -101,6 +103,8 @@ for (const [city, files] of folders) {
   // Last-updated date (task M5-2): the day of this build, in the city's time zone.
   const timeZone = (JSON.parse(files['city.json'] ?? '{}') as { time_zone?: string }).time_zone ?? 'UTC';
   write(resolve(out, 'metadata.json'), buildMetadata(city, new Date(), timeZone));
+  // Block numbers (task M5-5): optional; a city without blocks.csv writes no blocks.json and the page copes.
+  if (files['blocks.csv'] !== undefined) write(resolve(out, 'blocks.json'), buildBlocks(parseBlockRows(files['blocks.csv']), city));
   // The page loads the street list too, so it needs no other source.
   write(resolve(out, 'segments.geojson'), segments);
   // Validated above; polygons and configs pass through unchanged.

@@ -91,3 +91,28 @@ describe('passThroughFiles', () => {
     expect(passThroughFiles(files)).toEqual(['city.json', 'curb-colors.json']);
   });
 });
+
+describe('blocks.csv borrowing (task M5-5)', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'blocks-'));
+    mkdirSync(join(dir, 'burbank'));
+    mkdirSync(join(dir, 'burbank-sample'));
+    writeFileSync(join(dir, 'burbank', 'segments.geojson'), '{}');
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('supplies blocks.csv to a sample folder from its source city', () => {
+    writeFileSync(join(dir, 'burbank', 'blocks.csv'), 'source');
+    expect(loadCityFiles(dir, 'burbank-sample')['blocks.csv']).toBe('source');
+  });
+  it('copes with the source not having one, and does not override its own', () => {
+    expect('blocks.csv' in loadCityFiles(dir, 'burbank-sample')).toBe(false);
+    writeFileSync(join(dir, 'burbank', 'blocks.csv'), 'source');
+    writeFileSync(join(dir, 'burbank-sample', 'blocks.csv'), 'own');
+    expect(loadCityFiles(dir, 'burbank-sample')['blocks.csv']).toBe('own');
+  });
+  it('does not pass blocks.csv through; the build turns it into blocks.json', () => {
+    expect(passThroughFiles({ 'blocks.csv': 'x', 'city.json': 'x' })).toEqual(['city.json']);
+  });
+});

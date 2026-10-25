@@ -66,6 +66,12 @@ export interface TrimData {
   segments: Record<string, SegmentTrim>;
 }
 
+/** Written by build:data to public/data/<folder>/blocks.json (task M5-5): segment_id to block number, null when not recorded. */
+export interface BlockNumbers {
+  city_id: string;
+  blocks: Record<string, number | null>;
+}
+
 export interface CityData {
   cityId: string;
   city: CityConfig;
@@ -77,6 +83,8 @@ export interface CityData {
   coverage: Coverage;
   trim: TrimData;
   metadata: CityMetadata;
+  /** Absent when the city has no blocks.csv (task M5-5). */
+  blocks: BlockNumbers | null;
   /** Absent when the city has no polygons or config of this kind yet. */
   zoning: PolygonCollection | null;
   permitZones: PolygonCollection | null;
@@ -115,7 +123,7 @@ export async function loadCity(cityId: string, options: LoadOptions = {}): Promi
   const required = <T>(file: string) => getJson<T>(fetcher, url(file), false) as Promise<T>;
   const optional = <T>(file: string) => getJson<T>(fetcher, url(file), true);
 
-  const [city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, metadata, zoning, permitZones, curbColorConfig, zoningCategories] =
+  const [city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, metadata, zoning, permitZones, curbColorConfig, zoningCategories, blocks] =
     await Promise.all([
       required<CityConfig>('city.json'),
       required<SegmentCollection>('segments.geojson'),
@@ -130,7 +138,8 @@ export async function loadCity(cityId: string, options: LoadOptions = {}): Promi
       optional<PolygonCollection>('permit-zones.geojson'),
       optional<CurbColorsConfig>('curb-colors.json'),
       optional<ZoningCategoriesConfig>('zoning-categories.json'),
+      optional<BlockNumbers>('blocks.json'),
     ]);
 
-  return { cityId, city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, metadata, zoning, permitZones, curbColorConfig, zoningCategories };
+  return { cityId, city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, metadata, zoning, permitZones, curbColorConfig, zoningCategories, blocks };
 }
