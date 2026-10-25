@@ -13,11 +13,14 @@
         font: 600 14px system-ui, sans-serif; color: #5c3b00; background: #ffd966;
       }
       #app { position: relative; }
-      #zoning-legend, #timed-parking-legend {
-        position: absolute; left: 10px; bottom: 28px; z-index: 1; padding: 6px 10px;
-        font: 12px system-ui, sans-serif; background: rgba(255, 255, 255, 0.92); border-radius: 4px;
+      #legends {
+        position: absolute; right: 10px; bottom: 28px; z-index: 1; display: flex; flex-direction: column; align-items: flex-end;
+        gap: 6px; max-height: 45%; overflow-y: auto;
       }
-      #timed-parking-legend { left: auto; right: 10px; }
+      #legends > div {
+        padding: 6px 10px; font: 12px system-ui, sans-serif; background: rgba(255, 255, 255, 0.92); border-radius: 4px;
+      }
+      #legends > div[hidden] { display: none; }
       #layer-toggles {
         position: absolute; left: 10px; top: 10px; z-index: 1; margin: 0; padding: 6px 10px;
         font: 12px system-ui, sans-serif; background: rgba(255, 255, 255, 0.92); border: 0; border-radius: 4px;
@@ -75,14 +78,66 @@
         display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -2px;
         border: 1px solid rgba(0, 0, 0, 0.3);
       }
-      #zoning-legend .swatch, #timed-parking-legend .swatch {
+      #legends .swatch {
         display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -2px;
         border: 1px solid rgba(0, 0, 0, 0.3);
+      }
+
+      /* Layout (M5-1). Wide screens: the map fills #app and the controls float over it where they are placed above. */
+      #map { position: absolute; inset: 0; }
+      #panel { position: absolute; inset: 0; pointer-events: none; }
+      #panel * { pointer-events: auto; }
+      #controls, #curb-detail-host { display: contents; }
+      #panel-toggle { display: none; }
+      #permit-zones-legend { top: 236px; }
+
+      /* Touch targets of at least 44 px on phones and any touch screen. */
+      @media (max-width: 700px), (pointer: coarse) {
+        #panel button, #panel select, #panel summary, #panel input[type="range"] { min-height: 44px; box-sizing: border-box; }
+        #panel button { min-width: 44px; font-size: 14px; }
+        #panel select { font-size: 16px; }
+        #layer-toggles label { display: flex; align-items: center; min-height: 44px; }
+        #layer-toggles input { width: 24px; height: 24px; flex: none; margin: 0 10px 0 0; }
+        #zone-filter { display: flex; align-items: center; gap: 8px; }
+        #day-zones summary { display: flex; align-items: center; }
+        #day-zones button { min-height: 44px; }
+        .maplibregl-ctrl-group button { width: 44px; height: 44px; }
+        .maplibregl-ctrl-attrib-button { width: 44px; height: 44px; }
+      }
+
+      /* Narrow screens: the map takes the space above a bottom panel that holds every control. */
+      @media (max-width: 700px) {
+        #app { display: flex; flex-direction: column; }
+        #map { position: relative; inset: auto; flex: 1; min-height: 0; }
+        #panel {
+          position: static; flex: none; display: flex; flex-direction: column; max-height: 55vh;
+          overflow-y: auto; pointer-events: auto; background: #fff; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.25);
+        }
+        #panel-toggle { display: block; width: 100%; flex: none; font-weight: 600; }
+        #controls, #curb-detail-host { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; }
+        #curb-detail-host { padding: 0; }
+        #panel[data-collapsed] #controls { display: none; }
+        #controls > *, #legends > div, #curb-detail {
+          position: static; transform: none; width: auto; max-height: none; box-sizing: border-box;
+          background: #f6f6f6; box-shadow: none;
+        }
+        #curb-detail { padding: 8px 10px; background: #fff; border-bottom: 1px solid #ddd; overflow-y: visible; }
+        #day-zones ul { max-height: 30vh; }
+        #legends { align-items: stretch; max-height: none; overflow: visible; padding: 0; background: none; }
+        #time-controls .time-readout { font-size: 16px; }
+        #time-controls .day-picker button { padding: 0; }
       }
     </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div id="map"></div>
+      <div id="panel">
+        <button id="panel-toggle" type="button" aria-controls="controls" aria-expanded="true">Hide controls</button>
+        <div id="curb-detail-host"></div>
+        <div id="controls"><div id="legends"></div></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

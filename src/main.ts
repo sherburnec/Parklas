@@ -21,32 +21,48 @@ if (text) {
 }
 
 const app = document.getElementById('app') as HTMLElement;
+const mapEl = document.getElementById('map') as HTMLElement;
+const panel = document.getElementById('panel') as HTMLElement;
+// Every control and legend goes in here: floating over the map on wide screens, a bottom panel on narrow ones (M5-1).
+const controls = document.getElementById('controls') as HTMLElement;
+const legends = document.getElementById('legends') as HTMLElement;
+const detailHost = document.getElementById('curb-detail-host') as HTMLElement;
+
+// On a phone the panel starts collapsed so the map is visible; the toggle only changes layout, not data (state stays in memory).
+const panelToggle = document.getElementById('panel-toggle') as HTMLButtonElement;
+const setPanelOpen = (open: boolean): void => {
+  panel.toggleAttribute('data-collapsed', !open);
+  panelToggle.setAttribute('aria-expanded', String(open));
+  panelToggle.textContent = open ? 'Hide controls' : 'Show controls';
+};
+setPanelOpen(!window.matchMedia('(max-width: 700px)').matches);
+panelToggle.addEventListener('click', () => setPanelOpen(panel.hasAttribute('data-collapsed')));
 
 // The one shared state: day, hour and layer toggles, in memory and mirrored in the URL (M4-1).
 const state = createUrlState();
-createLayerToggles(app, state);
+createLayerToggles(controls, state);
 
 loadCity(CITY_ID)
   .then(async (city) => {
-    const basemap = createBasemap(app, city.segments, city.coverage.segment_ids);
+    const basemap = createBasemap(mapEl, city.segments, city.coverage.segment_ids);
     await basemap.ready;
     const zone = city.city.time_zone;
-    createTimeControls(app, state, zone);
+    createTimeControls(controls, state, zone);
     const toggles: Partial<Record<LayerKey, (visible: boolean) => void>> = {};
     const timeUpdates: Array<(at: TimeSelection) => void> = [];
 
     const { zoning, zoningCategories, permitZones, curbColorConfig } = city;
     if (zoning && zoningCategories) {
-      toggles.zoning = drawZoning(basemap.map, zoning, zoningCategories, basemap.underStreetsLayerId, app).setVisible;
+      toggles.zoning = drawZoning(basemap.map, zoning, zoningCategories, basemap.underStreetsLayerId, legends).setVisible;
     }
     let highlightZone: (code: string | null) => void = () => {};
     if (permitZones) {
       // After zoning, so the permit zones sit above it; both stay under the street lines and every band.
-      const zones = drawPermitZones(basemap.map, permitZones, basemap.underStreetsLayerId, app);
+      const zones = drawPermitZones(basemap.map, permitZones, basemap.underStreetsLayerId, controls);
       toggles.permit_zones = zones.setVisible;
       highlightZone = zones.highlight;
       // Zone filter (M4-5): the selector lists the codes in the permit zones file.
-      createZoneFilter(app, state, permitZoneLegend(permitZones).map((e) => e.code));
+      createZoneFilter(controls, state, permitZoneLegend(permitZones).map((e) => e.code));
     } else if (state.get().zone !== ZONE_ALL) {
       state.set({ zone: ZONE_ALL }); // no zones to filter by, so a zone in the URL cannot apply
     }
@@ -55,28 +71,28 @@ loadCity(CITY_ID)
     const sweeping = drawSweeping(basemap.map, city.sweeping, city.trim, initial, zone, basemap.underLabelsLayerId);
     toggles.sweeping = sweeping.setVisible;
     timeUpdates.push(sweeping.update);
-    const parking = drawTimedParking(basemap.map, city.timedParking, city.trim, initial, zone, basemap.underLabelsLayerId, app);
+    const parking = drawTimedParking(basemap.map, city.timedParking, city.trim, initial, zone, basemap.underLabelsLayerId, legends);
     toggles.timed_parking = parking.setVisible;
     timeUpdates.push(parking.update);
-    const restrictions = drawRestrictions(basemap.map, city.restrictions, city.trim, initial, zone, basemap.underLabelsLayerId, app);
+    const restrictions = drawRestrictions(basemap.map, city.restrictions, city.trim, initial, zone, basemap.underLabelsLayerId, legends);
     toggles.restrictions = restrictions.setVisible;
     timeUpdates.push(restrictions.update);
     if (curbColorConfig) {
-      const curb = drawCurbColors(basemap.map, city.curbColors, curbColorConfig, city.trim, initial, zone, basemap.underLabelsLayerId, app);
+      const curb = drawCurbColors(basemap.map, city.curbColors, curbColorConfig, city.trim, initial, zone, basemap.underLabelsLayerId, legends);
       toggles.curb_colors = curb.setVisible;
       timeUpdates.push(curb.update);
     }
     // Last, so its bands are drawn above every other band layer.
-    const noStopping = drawNoStopping(basemap.map, city.restrictions, city.trim, initial, zone, basemap.underLabelsLayerId, app);
+    const noStopping = drawNoStopping(basemap.map, city.restrictions, city.trim, initial, zone, basemap.underLabelsLayerId, legends);
     toggles.no_stopping = noStopping.setVisible;
     timeUpdates.push(noStopping.update);
 
     // Clicking a block lists every rule on both its sides, from the loaded rows rather than what is drawn (M4-3).
-    const detail = createCurbDetail(app, city, { timeZone: zone, unmappedMessage: UNMAPPED_MESSAGE, state });
+    const detail = createCurbDetail(detailHost, city, { timeZone: zone, unmappedMessage: UNMAPPED_MESSAGE, state });
     basemap.onSegmentClick((segmentId) => detail.show(segmentId));
 
     // Timed parking in force on the chosen day; picking one centres the map and opens its block (M4-4).
-    createDayZones(app, city, {
+    createDayZones(controls, city, {
       timeZone: zone,
       state,
       onSelect: (z) => {
