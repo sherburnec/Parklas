@@ -50,6 +50,19 @@
       #curb-detail .curb-rule.active { border-left-color: #1a73e8; background: #e8f0fe; }
       #curb-detail .curb-note { color: #555; }
       #curb-detail .curb-unmapped { font-weight: 600; }
+      #day-zones {
+        position: absolute; left: 50%; bottom: 28px; z-index: 1; transform: translateX(-50%); box-sizing: border-box; padding: 6px 10px;
+        width: min(300px, calc(100% - 20px)); font: 12px system-ui, sans-serif;
+        background: rgba(255, 255, 255, 0.95); border-radius: 4px;
+      }
+      #day-zones summary { cursor: pointer; font-weight: 600; }
+      #day-zones ul { margin: 6px 0 0; padding: 0; list-style: none; max-height: 40vh; overflow-y: auto; }
+      #day-zones button {
+        display: block; width: 100%; padding: 4px 6px; text-align: left; font: inherit; cursor: pointer;
+        background: none; border: 0; border-bottom: 1px solid #ddd;
+      }
+      #day-zones button:hover { background: #e8f0fe; }
+      #day-zones button span { display: block; color: #555; }
       #permit-zones-legend {
         position: absolute; left: 10px; top: 190px; z-index: 1; padding: 6px 10px;
         font: 12px system-ui, sans-serif; background: rgba(255, 255, 255, 0.92); border-radius: 4px;

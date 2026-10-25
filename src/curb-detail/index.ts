@@ -1,5 +1,9 @@
 export { createCurbDetail } from './panel';
 export type { CurbDetail, CurbDetailOptions } from './panel';
+export { createDayZones } from './day-zones-panel';
+export type { DayZonesOptions } from './day-zones-panel';
+export { zonesForDay } from './day-zones';
+export type { DayZone } from './day-zones';
 export { describeSegment } from './detail';
 export type { DetailData, DetailTime, RuleView, SegmentView, SideView } from './detail';
 export { scheduleText } from './format';

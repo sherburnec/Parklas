@@ -1,5 +1,5 @@
 import { createBasemap, UNMAPPED_MESSAGE } from './basemap';
-import { createCurbDetail } from './curb-detail';
+import { createCurbDetail, createDayZones } from './curb-detail';
 import { bannerText, getDataSet, loadCity } from './data-loader';
 import { drawCurbColors, drawNoStopping, drawPermitZones, drawRestrictions, drawSweeping, drawTimedParking, drawZoning } from './layers';
 import type { TimeSelection } from './layers';
@@ -64,6 +64,16 @@ loadCity(CITY_ID)
     // Clicking a block lists every rule on both its sides, from the loaded rows rather than what is drawn (M4-3).
     const detail = createCurbDetail(app, city, { timeZone: zone, unmappedMessage: UNMAPPED_MESSAGE, state });
     basemap.onSegmentClick((segmentId) => detail.show(segmentId));
+
+    // Timed parking in force on the chosen day; picking one centres the map and opens its block (M4-4).
+    createDayZones(app, city, {
+      timeZone: zone,
+      state,
+      onSelect: (z) => {
+        basemap.map.easeTo({ center: z.center, zoom: Math.max(basemap.map.getZoom(), 17) });
+        detail.show(z.segmentId);
+      },
+    });
 
     // Every layer reads the one state: a change to it restyles them all.
     let shown: AppState = initial;
