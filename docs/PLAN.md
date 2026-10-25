@@ -12,6 +12,9 @@ Phase 1 is a public GitHub Pages site that maps hand-made Burbank curb rules ont
 - Hosting is GitHub Pages. The data is not restricted, so the public site can carry real Burbank data as it is created.
 - A base street layer from OpenStreetMap covers every Burbank street, whether or not its rules have been mapped.
 - Permit zones are their own polygon file, one polygon per section of the city.
+- Permit zones are lettered A to H and never overlap: a location is in at most one zone. They are a separate category from the zoning polygons (residential, commercial and so on), with their own file and codes.
+- A rule row has at most one permit code. On a timed parking or other row, a code means permit holders for that zone are exempt; on a "no parking except by permit" row, it means only holders may park. A permit never exempts you from rows that are not marked.
+- "All sweeping in Zone C" is a filter by the zone's polygon, worked out at build time, not a mark on each route. This extends the PRD, which says filtering by a single permit is not required; add it to the PRD.
 - Street sweeping is day-by-day in Burbank. The schedule format must support week-of-month for later cities.
 - Time controls step by the hour.
 
@@ -34,6 +37,7 @@ Phase 1 is a public GitHub Pages site that maps hand-made Burbank curb rules ont
 - Base street layer for all of Burbank from OpenStreetMap, with street names and a "not yet mapped" state.
 - Six rule layers: zoning, street sweeping, timed parking, restrictions, no stopping/standing/parking, curb colors.
 - Permit zones polygon layer and a permit overview showing all zones together.
+- Zone filter (extends the PRD): limit every rule layer to sides inside one permit zone, using a zone assigned to each side at build time.
 - Day picker, hourly time slider, "Now" button in Burbank time, play button.
 - One toggle per layer, parallel side bands, click-through list of every rule on a curb side.
 - "Zones for the day" list for timed parking.
@@ -61,7 +65,7 @@ A static site reads prebuilt GeoJSON files; all heavy work (joining rules to str
 1. One-time script extracts Burbank streets from OpenStreetMap and splits them into blocks (intersection to intersection), each with a stable `segment_id`. The result is committed and frozen as `data/burbank/segments.geojson`.
 2. You author rules as CSV rows: `segment_id, side, layer, type, limit_minutes, permit_code, color_key, schedule`. Zoning and permit zones are drawn as polygon GeoJSON.
 3. The validator checks every file against JSON Schema and reports file, row and reason for each bad row.
-4. The build script joins rows to segments, adds `city_id`, and writes one GeoJSON file per layer, as the PRD data model specifies. It also writes a coverage file marking which segments have any rule, and (from M2-8) `trim.json` with the band geometry flags.
+4. The build script joins rows to segments, adds `city_id`, and writes one GeoJSON file per layer, as the PRD data model specifies. It also writes a coverage file marking which segments have any rule, (from M2-8) `trim.json` with the band geometry flags, and (from M2-9) a `permit_zone` on each side's features, found by testing the side against the permit zone polygons.
 5. The page loads those files through one loader and draws them.
 
 **Modules** (AR-2; each a folder with no imports from the others except through the listed interface)
@@ -95,7 +99,7 @@ App state (day, hour, toggles) lives in memory and the URL, never browser storag
 
 ## Work breakdown
 
-39 tasks across seven milestones (M0 to M6, plus four TD test-data tasks). Sizes: S = up to 1 day, M = 2 to 4 days, L = 1 to 2 weeks, all part-time. Estimates assume OSM data for Burbank is usable as-is and exclude your time creating rule data and drawing polygons, all of which is manual.
+44 tasks across seven milestones (M0 to M6, plus seven TD test-data tasks; TD-6 and TD-8, M2-9 and M4-5 added for permit zones). Sizes: S = up to 1 day, M = 2 to 4 days, L = 1 to 2 weeks, all part-time. Estimates assume OSM data for Burbank is usable as-is and exclude your time creating rule data and drawing polygons, all of which is manual.
 
 | ID | Task | Depends on | Size | Done when (binary) | Req |
 | --- | --- | --- | --- | --- | --- |
@@ -122,15 +126,19 @@ App state (day, hour, toggles) lives in memory and the URL, never browser storag
 | TD-5 ✅ | Citywide sample timed parking: extend the generator's timed parking step to add timed rows (also on a few newly mapped blocks), weighted toward `SAMPLE-` commercial and mixed-use zones. Limits 30, 60, 120, 180 and 240 minutes (30 tests the fallback style); most rows have a schedule such as Mon–Sat 08:00–18:00, a few have none; some sit on sides that also have sweeping; a few rows inside a `DEMO-` permit zone carry that zone's code. Own seeded generator, so other layers' rows do not move | TD-2, TD-3, TD-4 | S | `validate` passes; every limit appears in at least 2 separate parts of the city; unmapped blocks still outnumber mapped ones | Testing |
 | M3-4 ✅ | Street sweeping layer | M2-1, M3-1, M1-3 | M | Active sides highlight and inactive mute at the chosen hour | FR-4 |
 | M3-5 ✅ | Timed parking layer, style per limit | M2-1, M3-1, M1-3, M3-10 | M | 1, 2, 3 and 4 hour limits look different | FR-5 |
-| M3-6 | Restrictions layer, three styles plus permit code | M2-1, M3-1, M1-3, M3-10 | M | Each type is distinct; permit code shows where set | FR-6 |
+| TD-6 | Sample restrictions: extend the generator to cover all five types across the city (permit only, specific times, any time, no stopping, no standing). Permit-only rows sit inside `DEMO-` permit zones and use that zone's code; some no stopping rows on corner segments; some restrictions on sides that already have timed parking. Keep what TD-2 already produces and add only what is missing | TD-2, M2-6 | S | `validate` passes; each of the five types appears in at least 2 separate parts of the city | Testing |
+| M3-6 | Restrictions layer, three styles plus permit code, worded "Zone X permit required" for "except by permit" rows and "Zone X permit exempt" for other rows with a code. Timed parking (M3-5, done) shows the code without this wording; add "Zone X permit exempt" there too when this task lands | M2-1, M3-1, M1-3, M3-10, TD-6 | M | Each type is distinct; permit code shows where set | FR-6 |
 | M3-7 | No stopping/standing/parking layer | M3-6 | S | Highest-contrast style; own toggle | FR-7 |
 | M3-8 | Curb colors from config | M2-1, M3-1, M1-3, M3-10 | S | A new color appears after editing only the config | FR-8 |
-| M3-9 | Permit zones polygons and overview | M3-1 | M | All permit zones show together with their codes | FR-10 |
+| TD-8 | Sample permit zones: extend the generator to 8 non-overlapping `DEMO-` permit zones (`DEMO-A` to `DEMO-H`) across the city, mostly in `SAMPLE-` residential zones, following street lines; at least two share an edge; most of the city is outside any zone. Every `DEMO-` code in the rules has a zone and every zone has at least one rule | TD-2, TD-6 | S | `validate` passes; every `DEMO-` code in the rules has a matching zone; zones appear in at least 4 separate parts of the city; no two zones overlap | Testing |
+| M3-9 | Permit zones polygons and overview | M3-1, TD-8 | M | All permit zones show together with their codes | FR-10 |
+| M2-9 | Permit zone assignment at build time: for each side of each block, the build script tests a point just off the block's midpoint, toward that side, against the permit zone polygons and writes `permit_zone` (the zone's code: A to H in real data, `DEMO-A` to `DEMO-H` in the sample set, or none) on that side's features. Nothing is marked by hand on sweeping or any other rule. Validator checks: permit zones don't overlap; every `permit_code` on a rule row names a zone in the file; a warning when a row's code differs from the zone its side falls in; a warning for a block whose two ends fall in different zones. Test first | M2-4, M2-6, TD-8 | M | Tests cover a side inside one zone, the two sides of a street on a zone border (different zones), a side outside every zone, overlapping zones (rejected) and a rule row naming an unknown zone (rejected); `build:data` writes `permit_zone` for the sample set; `npm test` and `npm run build` pass | FR-10 (extended) |
 | M3-10 ✅ | Layers apply the band geometry flags: bands are cut by `trim_start_m` / `trim_end_m`, inner-facing sides are not drawn, flagged slivers are drawn only if they have a rule row. Retrofit the finished sweeping layer; all later rule layers (M3-5 to M3-8) use the same shared helper. The loader exposes `trim.json`; the layers do no geometry of their own. The hard-coded band constants in `src/layers/sweeping.ts` (`FIRST_OFFSET_PX`, `OFFSET_STEP_PX`, `WIDTH_PX`, `MIN_WIDTH_PX`) are replaced by the shared config from M2-8 | M2-8, M3-4 | M | On the downtown fork, sweeping bands no longer cross at z17; a sliver with no rule is not drawn and one with a rule is; the hidden inner side still appears in the click-through data; `npm test` and `npm run build` pass | FR-9, FR-11 |
 | M4-1 | Shared time state and per-layer toggles | M2-1 | S | One change updates every layer | FR-1 |
 | M4-2 | Day picker, hourly slider, Now (America/Los\_Angeles), play | M4-1 | M | Now matches Burbank local hour on both sides of a DST change | FR-2 |
-| M4-3 | Click-through list: every rule on a side, active or not, next change | M2-1, M3-4 | M | List matches the CSV rows for that side, with correct next change; inner-facing sides and skipped slivers (not drawn, per M2-8 and M3-10) still list their rules | FR-9 |
-| M4-4 | "Zones for the day" list | M3-5 | S | Lists each timed zone in force that day with its hours | FR-5 |
+| M4-3 | Click-through list: every rule on a side, active or not, next change, permit exemptions in words, and the permit zone the side lies in | M2-1, M3-4, M2-9 | M | List matches the CSV rows for that side, with correct next change; inner-facing sides and skipped slivers (not drawn, per M2-8 and M3-10) still list their rules | FR-9 |
+| M4-4 | "Zones for the day" list, including any permit exemption | M3-5 | S | Lists each timed zone in force that day with its hours | FR-5 |
+| M4-5 | Zone filter: a selector (All, each permit zone, No zone) that limits every rule layer, sweeping included, to sides whose `permit_zone` matches, and highlights the chosen zone's polygon. Choice is kept in the shared state and URL | M2-9, M4-1, M3-9 | S | Choosing a zone shows only sides in that zone for every layer, with no hand-marked routes; reloading the URL restores the choice; `npm test` and `npm run build` pass | FR-10 (extended) |
 | M5-1 | Responsive layout and touch targets | M4-2 | M | All controls usable at 375 px width | FR-14 |
 | M5-2 | Last-updated date and reference-tool label | M3-1 | S | Both visible on load | FR-13 |
 | M5-3 | Basemap isolation check | M3-2 | S | Replacing the basemap module needs no change elsewhere | AR-1 |
@@ -155,6 +163,8 @@ The first demo (one layer driven by the time slider over real streets) lands aft
 - Your data entry (M6-1) starts once M2-5 gives you templates and M2-7 gives you the authoring map, alongside M3 and M4.
 - M3-3 (zoning, done) and M3-9 (permit zones) need only the loader, not the band spike or band flags.
 - M2-7 (authoring map) and M2-8 (band flags) can run side by side after M2-6. M3-5 to M3-8 wait on M3-10.
+- M2-9 runs after TD-8 (it needs the sample permit zones to test against); M4-5 runs after M4-1 and M2-9.
+- TD-6 runs just before M3-6, and TD-8 just before M3-9.
 
 **Milestones**
 
@@ -208,7 +218,7 @@ The schedule engine and the build script carry the correctness risk, so they get
 | --- | --- | --- |
 | Pick the polygon drawing tool (QGIS or geojson.io); Burbank publishes no boundaries, so all are hand-drawn | Non-blocking | M3-3, M3-9 |
 | Final zoning category grouping for the 25 to 30 codes | Non-blocking | M3-3 (defaults used until set) |
-| How many permit zone types exist and their codes | Non-blocking | M3-9 |
+| Add the zone filter (FR-10 extension) and the A to H permit zone rules to the PRD requirements and decisions | Non-blocking | M4-5 |
 | Which pilot area to map first | Blocking for M6-1 | Week 3 |
 | PRD roadmap gates, if they differ from the exit criteria here | Non-blocking | M6-3 |
 
