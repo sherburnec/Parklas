@@ -34,12 +34,15 @@ export function citiesToProcess(dataDir: string, requested: string[], dataSet: D
   return selectCities(folders, dataSet);
 }
 
-/** Every file in data/<city>/ by name. A sample folder also gets its source city's segments.geojson. */
+/**
+ * Every data file in data/<city>/ by name; Markdown notes (the sample set's test-cases.md, task TD-9) are not data and are skipped.
+ * A sample folder also gets its source city's segments.geojson.
+ */
 export function loadCityFiles(dataDir: string, city: string): Record<string, string> {
   const dir = resolve(dataDir, city);
   const files: Record<string, string> = {};
   for (const f of readdirSync(dir, { withFileTypes: true })) {
-    if (f.isFile()) files[f.name] = readFileSync(resolve(dir, f.name), 'utf8');
+    if (f.isFile() && !f.name.endsWith('.md')) files[f.name] = readFileSync(resolve(dir, f.name), 'utf8');
   }
   const source = sourceCityOf(city);
   if (source !== null && !('segments.geojson' in files)) {

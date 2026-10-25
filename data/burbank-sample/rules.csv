@@ -2844,3 +2844,17 @@ burbank-358545935-1830103173,L,timed_parking,,180,,,,"{""windows"":[{""days"":["
 burbank-122900992-6853139152,L,sweeping,,,,,,"{""windows"":[{""days"":[""mon""],""start"":""10:00"",""end"":""12:00""}]}"
 burbank-122900992-6853139152,R,sweeping,,,,,,"{""windows"":[{""days"":[""tue""],""start"":""10:00"",""end"":""12:00""}]}"
 burbank-123139384-4077022913,L,restrictions,no_stopping,,,,,"{""windows"":[{""days"":[""mon"",""tue"",""wed"",""thu"",""fri""],""start"":""07:00"",""end"":""09:00""}]}"
+burbank-1790974706-1790974762,L,sweeping,,,,,,"{""windows"":[{""days"":[""tue""],""start"":""08:30"",""end"":""10:30""}]}"
+burbank-1790974706-1790974762,L,timed_parking,,120,,,,
+burbank-1790974706-1790974762,L,restrictions,no_parking,,,,,"{""windows"":[{""days"":[""fri"",""sat""],""start"":""22:00"",""end"":""06:00""}]}"
+burbank-1790974706-1790974762,L,curb_color,,,,,green,
+burbank-35315142-122940798,R,sweeping,,,,,,"{""windows"":[{""days"":[""mon""],""start"":""08:00"",""end"":""10:00""}]}"
+burbank-35315142-122940798,R,timed_parking,,60,,,,"{""windows"":[{""days"":[""mon"",""tue"",""wed"",""thu"",""fri"",""sat""],""start"":""08:00"",""end"":""18:00""}]}"
+burbank-35315142-122940798,R,restrictions,no_standing,,,,,"{""windows"":[{""days"":[""sun""],""start"":""20:00"",""end"":""04:00""}]}"
+burbank-35315142-122940798,R,curb_color,,,,,red,"{""windows"":[{""days"":[""mon"",""tue"",""wed"",""thu"",""fri""],""start"":""16:00"",""end"":""18:00""}]}"
+burbank-79183030-79183039,L,sweeping,,,,,,"{""windows"":[{""days"":[""mon""],""start"":""09:00"",""end"":""11:00"",""weeks_of_month"":[1,3]}]}"
+burbank-79183030-79183039,L,timed_parking,,30,,,,"{""windows"":[{""days"":[""mon"",""tue"",""wed"",""thu"",""fri"",""sat""],""start"":""09:00"",""end"":""18:00""}]}"
+burbank-79183030-79183039,L,restrictions,no_stopping,,,,,"{""windows"":[{""days"":[""mon"",""tue"",""wed"",""thu"",""fri""],""start"":""07:00"",""end"":""09:00""}]}"
+burbank-79183030-79183039,L,curb_color,,,,,blue,
+burbank-13511091009-13511091010,R,timed_parking,,120,,,,"{""windows"":[{""days"":[""mon"",""tue"",""wed"",""thu"",""fri""],""start"":""08:00"",""end"":""18:00""}]}"
+burbank-78826575-725245678,L,curb_color,,,,,yellow,"{""windows"":[{""days"":[""sat"",""sun""],""start"":""09:00"",""end"":""17:00""}]}"

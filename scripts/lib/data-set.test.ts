@@ -50,6 +50,11 @@ describe('loadCityFiles', () => {
   });
 
 
+  it('skips Markdown notes such as test-cases.md, which are not data', () => {
+    writeFileSync(join(dir, 'burbank-sample', 'test-cases.md'), '# notes');
+    expect(Object.keys(loadCityFiles(dir, 'burbank-sample')).sort()).toEqual(['city.json', 'segments.geojson']);
+  });
+
   it('supplies segments.geojson from the source city to a sample folder without a copy', () => {
     const files = loadCityFiles(dir, 'burbank-sample');
     expect(files['city.json']).toBe('{"sample":true}');

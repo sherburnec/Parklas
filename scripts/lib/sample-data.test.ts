@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { buildLayers, parseRuleRows, type RuleRow, type SegmentCollection } from './build.ts';
 import { generatePermitZones, permitZonesToJson } from './sample-permit-zones.ts';
 import { cellOf, CURB_COLORS, curbColorsToJson, generateSampleRows, isCorner, permitCodeAt, rowsToCsv, SAMPLE_SEED, TARGET_MAPPED_SHARE, zoneAt, type PermitZoneCollection } from './sample-data.ts';
+import { addEdgeCases, pickEdgeCases } from './sample-edge-cases.ts';
 import { generateZoning } from './sample-zoning.ts';
+import type { TrimData } from './trim.ts';
 
 // A 60 x 60 street grid over Burbank's extent: alternating east-west and north-south blocks.
 function gridSegments(): SegmentCollection {
@@ -546,7 +548,9 @@ describe('data/burbank-sample', () => {
   it('is exactly what the generator writes (seed 20261023)', () => {
     const permitZones = JSON.parse(readFileSync(resolve(root, 'burbank-sample', 'permit-zones.geojson'), 'utf8')) as PermitZoneCollection;
     const context = { zoning: generateZoning(real, 'burbank-sample'), permitZones };
-    expect(csv.replace(/\r\n/g, '\n')).toBe(rowsToCsv(generateSampleRows(real, 20261023, context)));
+    const trim = JSON.parse(readFileSync(resolve(root, 'burbank', 'trim.json'), 'utf8')) as TrimData;
+    const base = generateSampleRows(real, 20261023, context);
+    expect(csv.replace(/\r\n/g, '\n')).toBe(rowsToCsv(addEdgeCases(base, pickEdgeCases(base, real, trim, 20261023)))); // edge cases: TD-9
   });
 
   it('has rows for every rule layer in at least 4 distinct parts of the city', () => {

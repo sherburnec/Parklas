@@ -80,16 +80,16 @@ function pickSegments(segments: SegmentCollection, rng: Rng): Set<string> {
   return picked;
 }
 
-const SIDES: [Side, Side] = ['L', 'R'];
+export const SIDES: [Side, Side] = ['L', 'R'];
 
-const pick = <T>(items: readonly T[], rng: Rng): T => items[Math.floor(rng() * items.length)];
+export const pick = <T>(items: readonly T[], rng: Rng): T => items[Math.floor(rng() * items.length)];
 const chance = (p: number, rng: Rng) => rng() < p;
-const win = (days: string[], start: string, end: string, weeks_of_month?: number[]): Schedule => ({
+export const win = (days: string[], start: string, end: string, weeks_of_month?: number[]): Schedule => ({
   windows: [{ days, start, end, ...(weeks_of_month ? { weeks_of_month } : {}) }],
 });
 
-const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri'];
-const MON_SAT = [...WEEKDAYS, 'sat'];
+export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri'];
+export const MON_SAT = [...WEEKDAYS, 'sat'];
 const DAY_NAMES = ['mon', 'tue', 'wed', 'thu', 'fri'];
 const PERMITS = ['DEMO-A', 'DEMO-B', 'DEMO-C', 'DEMO-D'];
 const LIMITS = [60, 120, 180, 240];
@@ -305,7 +305,7 @@ const ADD_ANY_TIME = [0.05, 0.006];
 const ADD_NO_STANDING = [0.04, 0.004];
 const ADD_ON_TIMED_SIDE = 0.2;
 
-const metres = (a: number[], b: number[]) => Math.hypot((b[0] - a[0]) * 92000, (b[1] - a[1]) * 111000); // Burbank's latitude
+export const metres = (a: number[], b: number[]) => Math.hypot((b[0] - a[0]) * 92000, (b[1] - a[1]) * 111000); // Burbank's latitude
 
 const streetsAtCache = new WeakMap<SegmentCollection, Map<string, Set<string>>>();
 
