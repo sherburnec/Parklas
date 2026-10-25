@@ -220,6 +220,12 @@ describe('timed parking spread (TD-5)', () => {
     expect(new Set(inZone.map((r) => r.permit_code)).size).toBeGreaterThanOrEqual(2);
   });
 
+  it('gives every coded timed row the code of the permit zone its block lies in (TD-2 rows updated)', () => {
+    const coded = timed.filter((r) => r.permit_code !== null);
+    expect(coded.length).toBeGreaterThan(0);
+    for (const r of coded) expect(permitCodeAt(realById.get(r.segment_id)!, permitZones), r.segment_id).toBe(r.permit_code);
+  });
+
   it('writes no duplicate (segment, side) timed rows', () => {
     expect(new Set(timed.map((r) => `${r.segment_id}|${r.side}`)).size).toBe(timed.length);
   });
@@ -262,7 +268,8 @@ describe('restrictions spread (TD-6)', () => {
     expect(generateSampleRows(real, SAMPLE_SEED, context)).toEqual(rows);
     const old = base.filter((r) => r.layer === 'restrictions');
     expect(restrictions.length).toBeGreaterThan(old.length);
-    expect(old.every((r) => restrictions.some((x) => same(x, r)))).toBe(true);
+    const noCode = (r: RuleRow) => JSON.stringify({ ...r, permit_code: null });
+    expect(old.every((r) => restrictions.some((x) => noCode(x) === noCode(r)))).toBe(true); // only the code may change, see below
   });
 
   it('has each of the five kinds in at least 2 separate parts of the city', () => {
@@ -291,6 +298,34 @@ describe('restrictions spread (TD-6)', () => {
     const timed = new Set(rows.filter((r) => r.layer === 'timed_parking').map((r) => `${r.segment_id}|${r.side}`));
     const onTimed = (rs: RuleRow[]) => rs.filter((r) => r.layer === 'restrictions' && timed.has(`${r.segment_id}|${r.side}`)).length;
     expect(onTimed(rows)).toBeGreaterThan(onTimed(base) + 5);
+  });
+
+  // Exemption rows: a scheduled no-parking row (weekdays 07:00-09:00, which no earlier step writes with a code) whose
+  // permit_code is the DEMO- zone it sits in, meaning holders of that zone's permit are exempt.
+  const isExempt = (r: RuleRow) =>
+    r.type === 'no_parking' && r.permit_code !== null && windowsOf(r).some((w) => w.start === '07:00' && w.end === '09:00');
+
+  it('gives a few other no-parking rows a zone code as an exemption, and leaves most rows unmarked', () => {
+    const exempt = restrictions.filter(isExempt);
+    expect(exempt.length).toBeGreaterThanOrEqual(8);
+    expect(new Set(exempt.map((r) => r.permit_code)).size).toBeGreaterThanOrEqual(2);
+    expect(new Set(exempt.map((r) => cellOf(byId.get(r.segment_id)!, real, 3))).size).toBeGreaterThanOrEqual(2);
+    for (const r of exempt) expect(permitCodeAt(byId.get(r.segment_id)!, permitZones), r.segment_id).toBe(r.permit_code);
+    expect(exempt.length).toBeLessThan(restrictions.length / 8);
+    expect(restrictions.filter((r) => r.permit_code === null).length).toBeGreaterThan(restrictions.length / 2);
+  });
+
+  it('gives every coded restriction row the code of the permit zone its block lies in (TD-2 rows updated)', () => {
+    const coded = restrictions.filter((r) => r.permit_code !== null);
+    expect(coded.length).toBeGreaterThan(0);
+    for (const r of coded) expect(permitCodeAt(byId.get(r.segment_id)!, permitZones), r.segment_id).toBe(r.permit_code);
+    // The TD-2 rows with a code outside their zone were updated in place: same rows, only the code differs.
+    const zoneOf = (r: RuleRow) => permitCodeAt(byId.get(r.segment_id)!, permitZones);
+    const wrong = base.filter((r) => r.layer === 'restrictions' && r.permit_code !== null && zoneOf(r) !== r.permit_code);
+    expect(wrong).toHaveLength(19);
+    for (const r of wrong) {
+      expect(restrictions.some((x) => same(x, { ...r, permit_code: zoneOf(r) })), r.segment_id).toBe(true);
+    }
   });
 
   it('writes no duplicate (segment, side) restriction rows and keeps unmapped blocks far more common', () => {

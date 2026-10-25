@@ -357,6 +357,53 @@ function spreadRestrictions(rows: RuleRow[], segments: SegmentCollection, ctx: S
   return [...rows, ...added];
 }
 
+/**
+ * TD-2 gave restriction and timed parking rows a random DEMO- code whatever zone the block was in. Now a code is the
+ * code of the zone its block lies in: a row in another zone takes that zone's code, a row outside every zone loses it.
+ * A plain lookup with no generator, so no other row moves.
+ */
+function alignPermitCodes(rows: RuleRow[], segments: SegmentCollection, ctx: SampleContext): RuleRow[] {
+  const byId = new Map(segments.features.map((f) => [f.properties.segment_id, f]));
+  return rows.map((r) => {
+    if (r.permit_code === null) return r;
+    const zone = permitCodeAt(byId.get(r.segment_id)!, ctx.permitZones);
+    return zone === r.permit_code ? r : { ...r, permit_code: zone };
+  });
+}
+
+const ADD_EXEMPT = [0.3, 0.03]; // [mapped, unmapped] chance for segments inside a permit zone
+
+/**
+ * Exemption codes (task TD-6): a few scheduled no-parking rows inside a DEMO- zone carry that zone's code, meaning its
+ * permit holders are exempt. They use a weekday 07:00-09:00 ban, which no earlier step writes with a code, and prefer a
+ * side that already has timed parking. Appended after everything else, with its own generator, so no row moves.
+ */
+function spreadExemptions(rows: RuleRow[], segments: SegmentCollection, ctx: SampleContext, seed: number): RuleRow[] {
+  const rng = mulberry32((seed ^ 0x45584d50) >>> 0);
+  const taken = new Set<string>();
+  const timed = new Set<string>();
+  const mapped = new Set<string>();
+  for (const r of rows) {
+    mapped.add(r.segment_id);
+    if (r.layer === 'restrictions') taken.add(`${r.segment_id}|${r.side}`);
+    if (r.layer === 'timed_parking') timed.add(`${r.segment_id}|${r.side}`);
+  }
+  const added: RuleRow[] = [];
+  for (const segment of segments.features) {
+    const id = segment.properties.segment_id;
+    const permit = permitCodeAt(segment, ctx.permitZones);
+    if (!permit || !chance(ADD_EXEMPT[mapped.has(id) ? 0 : 1], rng)) continue;
+    const free = SIDES.filter((s) => !taken.has(`${id}|${s}`));
+    if (free.length === 0) continue;
+    const side = free.find((s) => timed.has(`${id}|${s}`)) ?? pick(free, rng);
+    added.push({
+      segment_id: id, side, layer: 'restrictions', type: 'no_parking', limit_minutes: null, permit_code: permit, color_key: null,
+      schedule: win(WEEKDAYS, '07:00', '09:00'),
+    });
+  }
+  return [...rows, ...added];
+}
+
 export function generateSampleRows(segments: SegmentCollection, seed: number, context?: SampleContext): RuleRow[] {
   const rng = mulberry32(seed);
   const picked = pickSegments(segments, rng);
@@ -374,7 +421,8 @@ export function generateSampleRows(segments: SegmentCollection, seed: number, co
     }
   }
   if (!context) return rows;
-  return spreadRestrictions(spreadTimedParking(rows, segments, context, seed), segments, context, seed);
+  const restricted = spreadRestrictions(spreadTimedParking(alignPermitCodes(rows, segments, context), segments, context, seed), segments, context, seed);
+  return spreadExemptions(restricted, segments, context, seed);
 }
 
 const HEADER = 'segment_id,side,layer,type,limit_minutes,permit_code,color_key,schedule';
