@@ -17,6 +17,14 @@ const SCHEDULE = '"{""windows"":[{""days"":[""mon""],""start"":""08:00"",""end""
 
 const square = [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]];
 
+/** A permit zones file holding one zone, A, so a rule row may name it. */
+function zoneAFile(): string {
+  return JSON.stringify({
+    type: 'FeatureCollection',
+    features: [{ type: 'Feature', properties: { permit_code: 'A', name: 'Zone A', city_id: 'testville' }, geometry: { type: 'Polygon', coordinates: square } }],
+  });
+}
+
 function goodCity(): Record<string, string> {
   return {
     'city.json': JSON.stringify({ city_id: 'testville', name: 'Testville', time_zone: 'America/Los_Angeles' }),
@@ -110,11 +118,12 @@ describe('validateCity', () => {
   it('accepts permit_mode "required" or "exempt" on a no_parking restriction with a permit code', () => {
     for (const mode of ['required', 'exempt']) {
       const files = goodCity();
+      files['permit-zones.geojson'] = zoneAFile();
       files['rules.csv'] = [
         'segment_id,side,layer,type,limit_minutes,permit_code,permit_mode,color_key,schedule',
         `seg-1,L,restrictions,no_parking,,A,${mode},,`,
       ].join('\n');
-      expect(validateCity(files, schemas), mode).toEqual([]);
+      expect(validateCity(files, schemas).filter((p) => p.severity === 'error'), mode).toEqual([]);
     }
   });
 
@@ -361,19 +370,124 @@ describe('sample data set', () => {
       properties: { permit_code: code, name: 'Fake', city_id: 'testville-sample' },
       geometry: { type: 'Polygon', coordinates: square },
     });
-    files['permit-zones.geojson'] = JSON.stringify({ type: 'FeatureCollection', features: [permit('DEMO-A'), permit('A')] });
+    // The second zone sits apart from the first, so the overlap check has nothing to say here.
+    const apart = (code: string) => ({ ...permit(code), geometry: { type: 'Polygon', coordinates: [[[5, 5], [6, 5], [6, 6], [5, 6], [5, 5]]] } });
+    files['permit-zones.geojson'] = JSON.stringify({ type: 'FeatureCollection', features: [permit('DEMO-A'), apart('A')] });
     files['rules.csv'] += '\nseg-1,L,timed_parking,,120,DEMO-A,,\nseg-1,R,timed_parking,,120,B,,';
-    const problems = validateCity(files, schemas);
+    const problems = validateCity(files, schemas).filter((p) => p.severity === 'error' && p.reason.includes('DEMO-'));
     expect(problems.map((p) => [p.file, p.row])).toEqual([
       ['permit-zones.geojson', 2],
       ['rules.csv', 3],
     ]);
-    expect(problems.every((p) => p.reason.includes('DEMO-'))).toBe(true);
   });
 
   it('does not apply the fake-code prefixes to a real city', () => {
     const files = goodCity();
+    files['permit-zones.geojson'] = zoneAFile();
     files['rules.csv'] += '\nseg-1,R,timed_parking,,60,A,,';
+    expect(validateCity(files, schemas).filter((p) => p.severity === 'error')).toEqual([]);
+  });
+});
+
+describe('permit zone checks (task M2-9)', () => {
+  const rectOf = (x0: number, y0: number, x1: number, y1: number) => [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]];
+  const permit = (code: string, coordinates: number[][][]) => ({
+    type: 'Feature',
+    properties: { permit_code: code, name: `Zone ${code}`, city_id: 'testville' },
+    geometry: { type: 'Polygon', coordinates },
+  });
+  const errorsOf = (files: Record<string, string>) => validateCity(files, schemas).filter((p) => p.severity === 'error');
+  const warningsOf = (files: Record<string, string>) => validateCity(files, schemas).filter((p) => p.severity === 'warning');
+
+  // seg-1 runs west to east along y = 34.18 (L is north), 1 km long. A lies north of it, B south of it.
+  function permitCity(zones = [permit('A', rectOf(-118.32, 34.18, -118.29, 34.19)), permit('B', rectOf(-118.32, 34.17, -118.29, 34.18))]) {
+    const files = goodCity();
+    files['segments.geojson'] = JSON.stringify({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { segment_id: 'seg-1', street: 'Main St', from_street: null, to_street: null, city_id: 'testville' },
+          geometry: { type: 'LineString', coordinates: [[-118.31, 34.18], [-118.30, 34.18]] },
+        },
+      ],
+    });
+    files['permit-zones.geojson'] = JSON.stringify({ type: 'FeatureCollection', features: zones });
+    files['rules.csv'] = HEADER;
+    return files;
+  }
+
+  it('accepts zones that share a border, rows that name their own side\'s zone, and gives no warnings', () => {
+    const files = permitCity();
+    files['rules.csv'] += '\nseg-1,L,timed_parking,,60,A,,\nseg-1,R,timed_parking,,60,B,,\nseg-1,L,sweeping,,,,,';
     expect(validateCity(files, schemas)).toEqual([]);
+  });
+
+  it('marks schema problems as errors', () => {
+    const files = goodCity();
+    files['rules.csv'] += '\nseg-1,X,sweeping,,,,,';
+    expect(validateCity(files, schemas).every((p) => p.severity === 'error')).toBe(true);
+  });
+
+  it('rejects overlapping permit zones as an error naming both', () => {
+    const files = permitCity([permit('A', rectOf(-118.32, 34.17, -118.30, 34.19)), permit('B', rectOf(-118.31, 34.17, -118.29, 34.19))]);
+    const problems = errorsOf(files);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatchObject({ file: 'permit-zones.geojson', row: 2 });
+    expect(problems[0].reason).toMatch(/"B".*overlaps.*"A"/);
+  });
+
+  it('rejects a zone inside another zone', () => {
+    const files = permitCity([permit('A', rectOf(-118.32, 34.17, -118.29, 34.19)), permit('B', rectOf(-118.31, 34.175, -118.30, 34.185))]);
+    expect(errorsOf(files).map((p) => [p.file, p.row])).toEqual([['permit-zones.geojson', 2]]);
+  });
+
+  it('rejects a rule row naming a zone that is not in the permit zones file', () => {
+    const files = permitCity();
+    files['rules.csv'] += '\nseg-1,L,timed_parking,,60,Q,,';
+    const problems = errorsOf(files);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatchObject({ file: 'rules.csv', row: 2 });
+    expect(problems[0].reason).toMatch(/permit_code "Q".*permit-zones\.geojson/);
+  });
+
+  it('rejects a permit code when the city has no permit zones file at all', () => {
+    const files = permitCity();
+    delete files['permit-zones.geojson'];
+    files['rules.csv'] += '\nseg-1,L,timed_parking,,60,A,,';
+    const problems = errorsOf(files);
+    expect(problems).toHaveLength(1);
+    expect(problems[0].reason).toMatch(/no permit-zones\.geojson/);
+  });
+
+  it('warns, without failing, when a row\'s code differs from the zone its side falls in', () => {
+    const files = permitCity();
+    files['rules.csv'] += '\nseg-1,L,timed_parking,,60,B,,'; // the L side is in A
+    expect(errorsOf(files)).toEqual([]);
+    const warnings = warningsOf(files);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({ file: 'rules.csv', row: 2 });
+    expect(warnings[0].reason).toMatch(/"B".*"A"/);
+  });
+
+  it('warns when a row\'s side is outside every zone', () => {
+    const files = permitCity([permit('A', rectOf(-118.32, 34.18, -118.29, 34.19)), permit('B', rectOf(-118.40, 34.10, -118.39, 34.11))]);
+    files['rules.csv'] += '\nseg-1,R,timed_parking,,60,B,,';
+    const warnings = warningsOf(files);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].reason).toMatch(/outside every permit zone/);
+  });
+
+  it('warns for a block whose two ends fall in different zones', () => {
+    const files = permitCity([permit('A', rectOf(-118.32, 34.17, -118.305, 34.19)), permit('B', rectOf(-118.305, 34.17, -118.29, 34.19))]);
+    expect(errorsOf(files)).toEqual([]);
+    const warnings = warningsOf(files).filter((p) => p.file === 'segments.geojson');
+    expect(warnings.map((p) => p.row)).toEqual([1]); // one warning for the block, not one per side
+    expect(warnings[0].reason).toMatch(/"seg-1".*"A".*"B"/);
+  });
+
+  it('does not warn about ends when a block lies in one zone, or in none', () => {
+    expect(warningsOf(permitCity())).toEqual([]);
+    expect(warningsOf(permitCity([]))).toEqual([]);
   });
 });

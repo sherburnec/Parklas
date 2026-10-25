@@ -1,11 +1,15 @@
 // Pure logic for the data validator (task M2-3). No file I/O here: the CLI reads the files.
 import { Ajv, type ErrorObject, type ValidateFunction } from 'ajv';
+import { findOverlaps, permitZoneAt, permitZonesAtEnds, type PermitZones } from './permit-zones.ts';
+import type { Side } from './side-offset.ts';
 
 export interface Problem {
   file: string;
   /** CSV row (header is row 1) or GeoJSON feature number (first is 1). null when the problem is the whole file. */
   row: number | null;
   reason: string;
+  /** An error stops the build; a warning is printed and the build goes on. */
+  severity: 'error' | 'warning';
 }
 
 const SCHEMA_BY_FILE: Record<string, string> = {
@@ -129,6 +133,19 @@ function explain(errors: ErrorObject[]): string[] {
   return [...new Set(out)];
 }
 
+const isLine = (c: unknown): c is number[][] =>
+  Array.isArray(c) && c.length >= 2 && c.every((p) => Array.isArray(p) && p.length >= 2 && typeof p[0] === 'number' && typeof p[1] === 'number');
+
+const isRing = (r: unknown): boolean => Array.isArray(r) && r.length >= 4 && r.every(isPoint);
+const isPoint = (p: unknown): boolean => Array.isArray(p) && p.length >= 2 && typeof p[0] === 'number' && typeof p[1] === 'number';
+
+/** Shaped well enough for the overlap and side tests to run; the schema reports anything else. */
+const isPolygonal = (g: any): boolean => { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const polygon = (c: unknown) => Array.isArray(c) && c.length >= 1 && c.every(isRing);
+  if (g?.type === 'Polygon') return polygon(g.coordinates);
+  return g?.type === 'MultiPolygon' && Array.isArray(g.coordinates) && g.coordinates.length >= 1 && g.coordinates.every(polygon);
+};
+
 export function validateCity(files: Record<string, string>, schemas: object[]): Problem[] {
   const ajv = new Ajv({ allErrors: true, strict: false });
   for (const s of schemas) ajv.addSchema(s);
@@ -139,7 +156,7 @@ export function validateCity(files: Record<string, string>, schemas: object[]): 
   };
 
   const problems: Problem[] = [];
-  const add = (file: string, row: number | null, reason: string) => problems.push({ file, row, reason });
+  const add = (file: string, row: number | null, reason: string, severity: Problem['severity'] = 'error') => problems.push({ file, row, reason, severity });
   const parsed: Record<string, any> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   if (!('city.json' in files)) add('city.json', null, 'The city config file is missing');
@@ -219,13 +236,48 @@ export function validateCity(files: Record<string, string>, schemas: object[]): 
     });
   }
 
-  // Permit zones.
+  // Permit zones: not overlapping, so a location is in at most one (task M2-9).
+  const zoneFeatures: any[] = parsed['permit-zones.geojson']?.features ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const zones: PermitZones = { features: zoneFeatures.filter((f) => typeof f?.properties?.permit_code === 'string' && isPolygonal(f?.geometry)) };
+  const zoneCodes = new Set<string>(zones.features.map((f) => f.properties.permit_code));
+  const hasZoneFile = 'permit-zones.geojson' in parsed;
+  for (const { first, second } of findOverlaps(zones)) {
+    const rowOf = (z: PermitZones['features'][number]) => zoneFeatures.indexOf(z) + 1;
+    add(
+      'permit-zones.geojson',
+      rowOf(zones.features[second]),
+      `Zone "${zones.features[second].properties.permit_code}" overlaps zone "${zones.features[first].properties.permit_code}" (row ${rowOf(zones.features[first])}); permit zones must not overlap, only share a border`,
+    );
+  }
   if (sample && parsed['permit-zones.geojson']?.features) {
     (parsed['permit-zones.geojson'].features as any[]).forEach((f, i) => { // eslint-disable-line @typescript-eslint/no-explicit-any
       const code = f?.properties?.permit_code;
       if (typeof code === 'string' && !code.startsWith('DEMO-')) {
         add('permit-zones.geojson', i + 1, `Permit code "${code}" must start with DEMO- in a sample data set`);
       }
+    });
+  }
+
+  // Where each segment runs, to find the permit zone of each of its sides.
+  const lineOf = new Map<string, number[][]>();
+  const segmentFeatures: any[] = parsed['segments.geojson']?.features ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
+  for (const f of segmentFeatures) {
+    const c = f?.geometry?.coordinates;
+    if (typeof f?.properties?.segment_id === 'string' && isLine(c)) lineOf.set(f.properties.segment_id, c);
+  }
+  const SIDES: Side[] = ['L', 'R'];
+  const name = (code: string | null) => (code === null ? 'none' : `"${code}"`);
+
+  // A block whose two ends fall in different zones probably has a border cutting across it (warning only).
+  if (zones.features.length > 0) {
+    segmentFeatures.forEach((f, i) => {
+      const line = lineOf.get(f?.properties?.segment_id);
+      if (!line) return;
+      const split = SIDES.flatMap((side) => {
+        const { start, end } = permitZonesAtEnds(line, side, zones);
+        return start === end ? [] : [`${side} side ${name(start)} at the start, ${name(end)} at the end`];
+      });
+      if (split.length) add('segments.geojson', i + 1, `Block "${f.properties.segment_id}" has its ends in different permit zones (${split.join('; ')})`, 'warning');
     });
   }
 
@@ -272,6 +324,25 @@ export function validateCity(files: Record<string, string>, schemas: object[]): 
       if (!validateRow(rec)) for (const reason of explain(validateRow.errors ?? [])) add(file, n, reason);
       if (typeof rec.segment_id === 'string' && !segmentIds.has(rec.segment_id)) {
         add(file, n, `segment_id "${rec.segment_id}" is not in segments.geojson`);
+      }
+      if (typeof rec.permit_code === 'string' && !zoneCodes.has(rec.permit_code)) {
+        add(
+          file,
+          n,
+          hasZoneFile
+            ? `permit_code "${rec.permit_code}" is not a zone in permit-zones.geojson (add the zone there or fix the spelling)`
+            : `permit_code "${rec.permit_code}" is used but this city has no permit-zones.geojson`,
+        );
+      } else if (typeof rec.permit_code === 'string' && (rec.side === 'L' || rec.side === 'R') && lineOf.has(rec.segment_id as string)) {
+        const inZone = permitZoneAt(lineOf.get(rec.segment_id as string)!, rec.side, zones);
+        if (inZone !== rec.permit_code) {
+          add(
+            file,
+            n,
+            `permit_code "${rec.permit_code}" differs from the zone this side falls in (${inZone === null ? 'it is outside every permit zone' : `"${inZone}"`}); check the code, the side, or the zone polygon`,
+            'warning',
+          );
+        }
       }
       if (sample && typeof rec.permit_code === 'string' && !rec.permit_code.startsWith('DEMO-')) {
         add(file, n, `permit_code "${rec.permit_code}" must start with DEMO- in a sample data set`);

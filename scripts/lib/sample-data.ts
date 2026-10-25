@@ -3,6 +3,7 @@
 // Picks about 1 in 15 segments, spread over the whole city, and gives each some made-up rules.
 // Everything random comes from a seeded generator, so the same segments and seed give the same rows.
 import type { RuleRow, SegmentCollection, Side } from './build.ts';
+import { sidePointAt } from './permit-zones.ts';
 import type { ZoningCollection } from './sample-zoning.ts';
 
 export const SAMPLE_SEED = 20261023;
@@ -205,31 +206,13 @@ export function zoneAt(segment: Segment, zoning: ZoningCollection): ZoningCollec
   return zoning.features.find((z) => inRing(x, y, z.geometry.coordinates[0]));
 }
 
-const SIDE_OFFSET_M = 4;
-const M_PER_DEG_X = 92000; // Burbank's latitude
-const M_PER_DEG_Y = 111000;
-
 /**
  * A point just off the middle of a segment (by length), toward one side. L is to the left when facing from the first
  * to the last coordinate. Zone borders run along street lines, so a side is tested here, not the street itself.
+ * The build script (task M2-9) uses the same point, so the sample rules and the built `permit_zone` always agree.
  */
 export function sidePoint(segment: Segment, side: Side): [number, number] {
-  const c = segment.geometry.coordinates;
-  const lengths = c.slice(1).map((p, i) => Math.hypot((p[0] - c[i][0]) * M_PER_DEG_X, (p[1] - c[i][1]) * M_PER_DEG_Y));
-  let left = lengths.reduce((a, b) => a + b, 0) / 2;
-  let i = 0;
-  while (i < lengths.length - 1 && left > lengths[i]) left -= lengths[i++];
-  const t = lengths[i] === 0 ? 0 : left / lengths[i];
-  const [x0, y0] = c[i];
-  const [x1, y1] = c[i + 1];
-  const dx = (x1 - x0) * M_PER_DEG_X;
-  const dy = (y1 - y0) * M_PER_DEG_Y;
-  const len = Math.hypot(dx, dy) || 1;
-  const sign = side === 'L' ? 1 : -1;
-  return [
-    x0 + (x1 - x0) * t + (sign * (-dy / len) * SIDE_OFFSET_M) / M_PER_DEG_X,
-    y0 + (y1 - y0) * t + (sign * (dx / len) * SIDE_OFFSET_M) / M_PER_DEG_Y,
-  ];
+  return sidePointAt(segment.geometry.coordinates, side);
 }
 
 /** The permit code of the permit zone holding one side of a segment, if any. */

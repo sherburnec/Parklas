@@ -206,3 +206,38 @@ describe('buildLayers', () => {
     expect(() => buildLayers(segments(), [row({ side: 'E' })] as never, 'testville')).toThrow(/rules\.csv row 2.*ew-1.*L or R/);
   });
 });
+
+describe('permit_zone on built features (task M2-9)', () => {
+  const rectOf = (x0: number, y0: number, x1: number, y1: number) => [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]];
+  const zone = (code: string, coordinates: number[][][]) => ({ properties: { permit_code: code }, geometry: { type: 'Polygon' as const, coordinates } });
+  // ew-1 runs west to east along y = 34.18, so L is its north side. North of it is zone A, south of it zone B.
+  const border = { features: [zone('A', rectOf(-118.32, 34.18, -118.29, 34.19)), zone('B', rectOf(-118.32, 34.17, -118.29, 34.18))] };
+  const every = (side: 'L' | 'R') =>
+    (['sweeping', 'timed_parking', 'restrictions', 'curb_color'] as const).map((layer) => row({ side, layer, type: layer === 'restrictions' ? 'no_stopping' : null }));
+
+  it('puts each side of a street on a zone border in its own zone, in every layer', () => {
+    const out = buildLayers(segments(), [...every('L'), ...every('R')] as never, 'testville', border);
+    for (const fc of [out.sweeping, out.timedParking, out.restrictions, out.curbColors]) {
+      const zoneOf = (side: string) => fc.features.find((f) => f.properties.side === side)!.properties.permit_zone;
+      expect(zoneOf('L')).toBe('A');
+      expect(zoneOf('R')).toBe('B');
+    }
+  });
+
+  it('writes the zone for a side inside one zone', () => {
+    const inside = { features: [zone('C', rectOf(-118.32, 34.17, -118.29, 34.19))] };
+    const out = buildLayers(segments(), every('L') as never, 'testville', inside);
+    expect(out.sweeping.features[0].properties.permit_zone).toBe('C');
+  });
+
+  it('writes null for a side outside every zone, and when there are no zones', () => {
+    const far = { features: [zone('Z', rectOf(-118.20, 34.10, -118.19, 34.11))] };
+    expect(buildLayers(segments(), every('L') as never, 'testville', far).sweeping.features[0].properties.permit_zone).toBeNull();
+    expect(buildLayers(segments(), every('L') as never, 'testville').sweeping.features[0].properties.permit_zone).toBeNull();
+  });
+
+  it('is found from the polygons whatever the row says: a row naming another code keeps the side\'s own zone', () => {
+    const out = buildLayers(segments(), [row({ side: 'L', layer: 'timed_parking', limit_minutes: 60, permit_code: 'B' })] as never, 'testville', border);
+    expect(out.timedParking.features[0].properties).toMatchObject({ permit_code: 'B', permit_zone: 'A' });
+  });
+});

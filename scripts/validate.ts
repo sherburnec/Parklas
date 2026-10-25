@@ -4,7 +4,7 @@
 //   DATA_SET=real npm run validate   the real city folders
 //   npm run validate -- burbank      one named folder, whatever the DATA_SET
 //
-// Prints one line per problem (file, row, reason) and exits 1 if there are any.
+// Prints one line per problem (file, row, reason) and exits 1 if there are any errors. Warnings are printed but do not fail.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,10 +39,12 @@ for (const city of cities) {
   const files = loadCityFiles(dataDir, city);
   const problems: Problem[] = validateCity(files, schemas);
   for (const p of problems) {
-    console.error(`data/${city}/${p.file}${p.row === null ? '' : `, row ${p.row}`}: ${p.reason}`);
+    console.error(`${p.severity === 'warning' ? 'warning: ' : ''}data/${city}/${p.file}${p.row === null ? '' : `, row ${p.row}`}: ${p.reason}`);
   }
-  console.log(`${city}: ${Object.keys(files).length} files checked, ${problems.length} problem${problems.length === 1 ? '' : 's'}`);
-  total += problems.length;
+  const errors = problems.filter((p) => p.severity === 'error').length;
+  const warnings = problems.length - errors;
+  console.log(`${city}: ${Object.keys(files).length} files checked, ${errors} problem${errors === 1 ? '' : 's'}${warnings ? `, ${warnings} warning${warnings === 1 ? '' : 's'}` : ''}`);
+  total += errors;
 }
 
 process.exit(total > 0 ? 1 : 0);

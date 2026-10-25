@@ -122,6 +122,8 @@ Properties each polygon needs:
 - Zoning: `zone_code` (the exact code, like `R-1`), `category` (a key from `zoning-categories.json`), `name`, `city_id` (`burbank`).
 - Permit zones: `permit_code`, `name`, `city_id` (`burbank`).
 
+Permit zones must not overlap; two zones may share a border. Draw each border along the street line, so the two sides of that street fall in different zones. `build:data` works out each side's zone itself (a point 4 m off the middle of the block, toward that side) and writes it as `permit_zone` on that side's features in every layer file; you never mark a zone on a rule. The validator reports an error for overlapping zones and for a `permit_code` that names no zone in the file. It prints a warning (the build still runs) when a row's `permit_code` differs from the zone its side falls in, and when a block's two ends fall in different zones, which usually means a border cuts across the block.
+
 A new zone code needs a line in `zone_codes` in `zoning-categories.json` pointing at a category. A new curb color needs an entry in `curb-colors.json`.
 
 ## 5. Check and build

@@ -3,6 +3,7 @@ import { parseCsv } from './validate.ts';
 import type { SegmentCollection } from './segments.ts';
 
 export type { SegmentCollection };
+import { permitZoneAt, type PermitZones } from './permit-zones.ts';
 import { sideToOffset, type Offset, type Side } from './side-offset.ts';
 
 export { sideToOffset };
@@ -24,7 +25,7 @@ export interface RuleRow {
 
 export interface SideFeature {
   type: 'Feature';
-  properties: Record<string, unknown> & { segment_id: string; city_id: string; side: Side; offset: Offset };
+  properties: Record<string, unknown> & { segment_id: string; city_id: string; side: Side; offset: Offset; permit_zone: string | null };
   geometry: { type: 'LineString'; coordinates: Line };
 }
 
@@ -43,7 +44,11 @@ export interface BuiltLayers {
 
 const empty = (): SideCollection => ({ type: 'FeatureCollection', features: [] });
 
-export function buildLayers(segments: SegmentCollection, rows: RuleRow[], cityId: string): BuiltLayers {
+/**
+ * Join rule rows to segments. Every feature gets `permit_zone` (task M2-9): the zone its own side lies in, found from the
+ * permit zone polygons, or null. It never comes from the rule row's `permit_code`.
+ */
+export function buildLayers(segments: SegmentCollection, rows: RuleRow[], cityId: string, permitZones: PermitZones = { features: [] }): BuiltLayers {
   const byId = new Map(segments.features.map((f) => [f.properties.segment_id, f]));
   const out: BuiltLayers = {
     sweeping: empty(),
@@ -72,6 +77,7 @@ export function buildLayers(segments: SegmentCollection, rows: RuleRow[], cityId
       to_street: seg.properties.to_street,
       side: r.side,
       offset,
+      permit_zone: permitZoneAt(seg.geometry.coordinates, r.side, permitZones),
     };
     const geometry = { type: 'LineString' as const, coordinates: seg.geometry.coordinates };
     const feature = (extra: Record<string, unknown>): SideFeature => ({

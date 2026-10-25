@@ -12,6 +12,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildLayers, parseRuleRows, type SegmentCollection } from './lib/build.ts';
 import { citiesToProcess, loadCityFiles, parseDataSet, passThroughFiles, sourceCityOf } from './lib/data-set.ts';
+import type { PermitZones } from './lib/permit-zones.ts';
 import { buildTrim, type BandConfig, type TrimData } from './lib/trim.ts';
 import { validateCity } from './lib/validate.ts';
 
@@ -49,8 +50,8 @@ for (const city of cities) {
   const checked = { ...files };
   if (sourceCityOf(city) === null) delete checked['trim.json'];
   for (const p of validateCity(checked, schemas)) {
-    console.error(`data/${city}/${p.file}${p.row === null ? '' : `, row ${p.row}`}: ${p.reason}`);
-    problems++;
+    console.error(`${p.severity === 'warning' ? 'warning: ' : ''}data/${city}/${p.file}${p.row === null ? '' : `, row ${p.row}`}: ${p.reason}`);
+    if (p.severity === 'error') problems++;
   }
   folders.set(city, files);
 }
@@ -65,9 +66,11 @@ for (const [city, files] of folders) {
   // Every city draws its whole street base, sample sets included.
   const segments = JSON.parse(files['segments.geojson'] ?? '{"type":"FeatureCollection","features":[]}') as SegmentCollection;
   const rows = parseRuleRows(files['rules.csv'] ?? '');
+  // Each side's permit zone is found from the polygons (task M2-9); a city with no permit zones file gets none.
+  const permitZones = JSON.parse(files['permit-zones.geojson'] ?? '{"features":[]}') as PermitZones;
   let built;
   try {
-    built = buildLayers(segments, rows, city);
+    built = buildLayers(segments, rows, city, permitZones);
   } catch (err) {
     console.error(`data/${city}/${(err as Error).message}`);
     process.exit(1);
@@ -102,6 +105,7 @@ for (const [city, files] of folders) {
     `${city}: ${rows.length} rule rows -> sweeping ${built.sweeping.features.length}, timed parking ${built.timedParking.features.length}, ` +
       `restrictions ${built.restrictions.features.length}, curb colors ${built.curbColors.features.length}; ` +
       `${built.coverage.segment_ids.length}/${segments.features.length} segments covered; ` +
+      `${new Set([built.sweeping, built.timedParking, built.restrictions, built.curbColors].flatMap((l) => l.features).filter((f) => f.properties.permit_zone !== null).map((f) => `${f.properties.segment_id}/${f.properties.side}`)).size} ruled sides in a permit zone; ` +
       `${Object.values(trim.segments).filter((t) => t.sliver).length} slivers, ` +
       `${Object.values(trim.segments).reduce((n, t) => n + Number(t.inner_L) + Number(t.inner_R), 0)} inner sides`,
   );
