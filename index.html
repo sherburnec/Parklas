@@ -13,6 +13,12 @@
         font: 600 14px system-ui, sans-serif; color: #5c3b00; background: #ffd966;
       }
       #app { position: relative; }
+      #reference-note {
+        flex: none; padding: 4px 12px; text-align: center; font: 12px system-ui, sans-serif;
+        color: #333; background: #f0f0f0; border-top: 1px solid #ccc;
+      }
+      #reference-note [hidden] { display: none; }
+      #data-updated::before { content: " \00b7  "; }
       #legends {
         position: absolute; right: 10px; bottom: 28px; z-index: 1; display: flex; flex-direction: column; align-items: flex-end;
         gap: 6px; max-height: 45%; overflow-y: auto;
@@ -138,6 +144,11 @@
         <div id="controls"><div id="legends"></div></div>
       </div>
     </div>
+    <!-- Permanent reference label and data date (M5-2). The label is plain HTML so it shows even if the data fails to load. -->
+    <footer id="reference-note">
+      <strong>Reference tool only. Not the official source for citations.</strong>
+      <span id="data-updated" hidden></span>
+    </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

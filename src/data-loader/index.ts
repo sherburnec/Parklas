@@ -4,6 +4,7 @@ export { loadCity } from './load-city';
 export type {
   CityConfig,
   CityData,
+  CityMetadata,
   Coverage,
   CurbColorsConfig,
   LoadOptions,

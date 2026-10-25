@@ -20,6 +20,13 @@ export interface CityConfig {
   time_zone: string;
 }
 
+/** Written by build:data to public/data/<folder>/metadata.json (task M5-2). */
+export interface CityMetadata {
+  city_id: string;
+  /** YYYY-MM-DD in the city's time zone. */
+  last_updated: string;
+}
+
 export interface CurbColorsConfig {
   city_id: string;
   colors: Record<string, { label: string; hex: string; time_limit_minutes: number | null; default_schedule: Schedule }>;
@@ -69,6 +76,7 @@ export interface CityData {
   curbColors: SideCollection;
   coverage: Coverage;
   trim: TrimData;
+  metadata: CityMetadata;
   /** Absent when the city has no polygons or config of this kind yet. */
   zoning: PolygonCollection | null;
   permitZones: PolygonCollection | null;
@@ -107,7 +115,7 @@ export async function loadCity(cityId: string, options: LoadOptions = {}): Promi
   const required = <T>(file: string) => getJson<T>(fetcher, url(file), false) as Promise<T>;
   const optional = <T>(file: string) => getJson<T>(fetcher, url(file), true);
 
-  const [city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, zoning, permitZones, curbColorConfig, zoningCategories] =
+  const [city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, metadata, zoning, permitZones, curbColorConfig, zoningCategories] =
     await Promise.all([
       required<CityConfig>('city.json'),
       required<SegmentCollection>('segments.geojson'),
@@ -117,11 +125,12 @@ export async function loadCity(cityId: string, options: LoadOptions = {}): Promi
       required<SideCollection>('curb-colors.geojson'),
       required<Coverage>('coverage.json'),
       required<TrimData>('trim.json'),
+      required<CityMetadata>('metadata.json'),
       optional<PolygonCollection>('zoning.geojson'),
       optional<PolygonCollection>('permit-zones.geojson'),
       optional<CurbColorsConfig>('curb-colors.json'),
       optional<ZoningCategoriesConfig>('zoning-categories.json'),
     ]);
 
-  return { cityId, city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, zoning, permitZones, curbColorConfig, zoningCategories };
+  return { cityId, city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, metadata, zoning, permitZones, curbColorConfig, zoningCategories };
 }

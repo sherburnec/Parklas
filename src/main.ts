@@ -46,6 +46,9 @@ loadCity(CITY_ID)
   .then(async (city) => {
     const basemap = createBasemap(mapEl, city.segments, city.coverage.segment_ids);
     await basemap.ready;
+    const updated = document.getElementById('data-updated') as HTMLElement;
+    updated.textContent = `Data last updated ${city.metadata.last_updated}`;
+    updated.hidden = false;
     const zone = city.city.time_zone;
     createTimeControls(controls, state, zone);
     const toggles: Partial<Record<LayerKey, (visible: boolean) => void>> = {};

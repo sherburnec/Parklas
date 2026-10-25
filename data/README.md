@@ -34,6 +34,8 @@ Never edit `segments.geojson`. It is the street list and must not change. Every 
 
 ## Short blocks and inner sides on the map
 
+`npm run build:data` also writes `metadata.json` next to the built files, holding the folder's last-updated date, which is the day of the build in the city's time zone. The page shows it at the bottom.
+
 `npm run build:data` also writes `data/<city_id>/trim.json`, so the map can keep the side bands tidy. You never edit it, and it is rebuilt from `segments.geojson` and `config/band-geometry.json` (band offsets and widths). Two things follow for your data:
 
 - **A block under 20 m is drawn only if it has a rule row.** Short connecting blocks between two roads are left off the map unless you give them a rule. Their rows still work as normal.
