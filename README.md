@@ -21,7 +21,7 @@ It is a static website (no server) published to GitHub Pages. **It is a referenc
 
 ## Pages
 
-The site has two pages. A third page exists only for developers.
+The site has one map page and one authoring page for each data folder under `data/`: `/burbank/` and `/burbank-sample/`, and `/burbank/authoring.html` and `/burbank-sample/authoring.html`. The site root lists the folders to choose from, and `config/site.json` names the default one. A third page exists only for developers.
 
 ### 1. The map: `index.html` (public)
 
@@ -56,8 +56,8 @@ The site has two pages. A third page exists only for developers.
 
 Nothing on the public site links to this page. Open it by typing its address:
 
-- On your computer: `http://localhost:5173/authoring.html` (after `npm run dev`).
-- On the live site: add `authoring.html` to the end of the site address.
+- On your computer: `http://localhost:5173/burbank-sample/authoring.html` (after `npm run dev`).
+- On the live site: add `<folder>/authoring.html` to the site address, for example `burbank-sample/authoring.html`. `/authoring.html` opens the default folder's page.
 
 How to use it:
 
@@ -83,7 +83,7 @@ npm run build:data
 npm run dev
 ```
 
-Open the address Vite prints (usually `http://localhost:5173/`).
+Open the address Vite prints (usually `http://localhost:5173/`); it lists the folders. A new folder under `data/` (with a `city.json`) gets its own pages with no code change.
 
 `npm run build:data` must run at least once before `npm run dev`, because the page reads the map files it writes into `public/data/`. Run it again whenever you change anything in `data/`.
 
@@ -143,7 +143,7 @@ DATA_SET=real npm run build:data
 **Goal:** the north side of the 100 block of East Olive Avenue has 2-hour parking, Monday to Friday, 8 AM to 6 PM.
 
 **Step 1. Find the block and its side.**
-Open the authoring map (`http://localhost:5173/authoring.html`), zoom to the block and click it. Its `segment_id` is copied, for example `burbank-118435906-123108474`. Look at which coloured line runs along the curb you mean: blue is **L**, orange is **R**.
+Open the authoring map (`http://localhost:5173/burbank/authoring.html`), zoom to the block and click it. Its `segment_id` is copied, for example `burbank-118435906-123108474`. Look at which coloured line runs along the curb you mean: blue is **L**, orange is **R**.
 
 > L and R are always relative to the arrow on the block, never north, south, east or west. Burbank's streets are tilted about 45 degrees from the compass, so compass directions would be ambiguous.
 
@@ -162,7 +162,7 @@ Leave a cell empty (two commas in a row) when it does not apply. The street name
 ```
 $env:DATA_SET='real'; npm run validate
 $env:DATA_SET='real'; npm run build:data
-$env:DATA_SET='real'; npm run dev
+npm run dev   # then open http://localhost:5173/burbank/
 ```
 
 Click the block on the map and check the curb detail lists the new rule.
@@ -285,7 +285,7 @@ Watch it under the repository's **Actions** tab. The live address is shown under
 | `npm run preview` | Serves the built `dist/` site locally. |
 | `npm run lint` | Checks code style. |
 
-Add `DATA_SET=real` in front of `validate`, `build:data`, `dev` or `build` to use the real data instead of the sample (see [The update loop](#the-update-loop)).
+Add `DATA_SET=real` in front of `validate` or `build:data` to use the real data instead of the sample (see [The update loop](#the-update-loop)). The page picks its data from its address, not from `DATA_SET`.
 
 ---
 
@@ -299,7 +299,7 @@ data/
   burbank-sample/       Made-up test data
   README.md             Full data-entry guide
 schemas/                The rules each data file must follow
-config/                 Band widths and offsets, shared by build and page
+config/                 Band widths and offsets (shared by build and page), and the default data folder (site.json)
 scripts/                Validator, data build, OSM extraction, sample generator
 src/
   basemap/              Street lines and names (the only module that draws the base map)

@@ -1,6 +1,6 @@
 import { createBasemap, UNMAPPED_MESSAGE } from './basemap';
 import { createCurbDetail, createDayZones } from './curb-detail';
-import { bannerText, getDataSet, loadCity } from './data-loader';
+import { bannerText, currentRoute, loadCity } from './data-loader';
 import {
   drawCurbColors, drawNoStopping, drawPermitZones, drawRestrictions, drawSweeping, drawTimedParking, drawZoning, permitZoneLegend,
 } from './layers';
@@ -8,10 +8,11 @@ import type { TimeSelection } from './layers';
 import { LAYER_KEYS, ZONE_ALL, ZONE_NONE, createLayerToggles, createTimeControls, createUrlState, createZoneFilter } from './time-ui';
 import type { AppState, LayerKey } from './time-ui';
 
-const CITY_ID = 'burbank';
+// The page's own path names its data folder (task M5-7), such as burbank or burbank-sample.
+const FOLDER = currentRoute().folder;
 
 // The banner goes in before the map so the map is sized below it.
-const text = bannerText(getDataSet());
+const text = bannerText(FOLDER);
 if (text) {
   const banner = document.createElement('div');
   banner.id = 'data-banner';
@@ -42,7 +43,7 @@ panelToggle.addEventListener('click', () => setPanelOpen(panel.hasAttribute('dat
 const state = createUrlState();
 createLayerToggles(controls, state);
 
-loadCity(CITY_ID)
+loadCity(FOLDER)
   .then(async (city) => {
     const basemap = createBasemap(mapEl, city.segments, city.coverage.segment_ids);
     await basemap.ready;
@@ -124,6 +125,6 @@ loadCity(CITY_ID)
   .catch((err: unknown) => {
     const message = document.createElement('p');
     message.setAttribute('role', 'alert');
-    message.textContent = `Could not load ${CITY_ID} data. ${(err as Error).message}`;
+    message.textContent = `Could not load ${FOLDER} data. ${(err as Error).message}`;
     app.append(message);
   });

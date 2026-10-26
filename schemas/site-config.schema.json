@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parklas.local/schemas/site-config.schema.json",
+  "title": "Site config",
+  "description": "config/site.json. Site-wide settings, not tied to one city. default_folder is the data/ folder /authoring.html redirects to and the site root list marks as default; a test checks that it exists.",
+  "type": "object",
+  "required": ["default_folder"],
+  "additionalProperties": false,
+  "properties": {
+    "description": { "type": "string" },
+    "default_folder": { "type": "string", "pattern": "^[a-z0-9_-]+$", "description": "A folder name under data/, e.g. burbank-sample." }
+  }
+}

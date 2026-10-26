@@ -31,7 +31,10 @@ jobs:
       # Builds every city folder under data/ (sample and real) into public/data/<folder>/; Vite copies public/ into dist.
       - run: npm run build:data
       - run: DATA_SET=real npm run build:data
+      # SITE_BASE is the site's path on Pages. 404.html can be served at any depth, so its links to the maps need it.
       - run: npm run build
+        env:
+          SITE_BASE: /${{ github.event.repository.name }}/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

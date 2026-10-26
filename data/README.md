@@ -28,7 +28,7 @@ npm run generate:sample
 
 The script reads `data/burbank/segments.geojson` (it never changes it) and picks segments by sampling each part of an 8 x 8 grid over the city. To get a different spread, change `SAMPLE_SEED` in `scripts/lib/sample-data.ts`, then update the seed in `scripts/lib/sample-data.test.ts`. `npm test` fails if `rules.csv` is out of step with the script.
 
-The `DATA_SET` setting picks which folders `validate`, `build:data` and the page use: `sample` (the default) uses folders named `<city_id>-sample`, `real` uses the others. In PowerShell: `$env:DATA_SET='real'; npm run validate`. When the page uses the sample set it shows "Sample data. Not real Burbank rules."
+The `DATA_SET` setting picks which folders `validate` and `build:data` use: `sample` (the default) uses folders named `<city_id>-sample`, `real` uses the others. In PowerShell: `$env:DATA_SET='real'; npm run validate`. The page does not use it: each folder has its own address (`/burbank/`, `/burbank-sample/`), and a page whose folder name ends in `-sample` shows "Sample data. Not real Burbank rules."
 
 Never edit `segments.geojson`. It is the street list and must not change. Every `L` and `R` in `rules.csv` is read against the direction of its segment in that file, so a segment drawn the other way round would put its rows on the opposite curb. When the file is deliberately re-extracted (`node scripts/extract-burbank-segments.ts --force`), the script lists every segment whose direction is reversed, next to the added, removed and changed ones. It only reports; check the rows for those segments yourself.
 

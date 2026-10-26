@@ -1,7 +1,7 @@
 // The single entry point for city data (task M3-1, architecture rule 3). This is the only code
 // in the app that fetches anything. Phase 2 replaces the body with an API call.
 import type { FeatureCollection, LineString, Polygon } from 'geojson';
-import { dataFolder, getDataSet, type DataSet } from './data-set';
+import { currentRoute, dataBaseUrl } from './route';
 
 export type Side = 'L' | 'R';
 
@@ -95,8 +95,7 @@ export interface CityData {
 export type Fetcher = (url: string) => Promise<Response>;
 
 export interface LoadOptions {
-  dataSet?: DataSet;
-  /** Base URL that holds the data folders. Defaults to the page's data/ folder. */
+  /** Base URL that holds the data folders. Defaults to data/ under the site root, found from the page's path. */
   baseUrl?: string;
   fetcher?: Fetcher;
 }
@@ -114,10 +113,9 @@ async function getJson<T>(fetcher: Fetcher, url: string, optional: boolean): Pro
   }
 }
 
-/** Load every file for one city. City id is e.g. "burbank"; the data set picks burbank-sample or burbank. */
-export async function loadCity(cityId: string, options: LoadOptions = {}): Promise<CityData> {
-  const folder = dataFolder(cityId, options.dataSet ?? getDataSet());
-  const base = options.baseUrl ?? `${import.meta.env.BASE_URL}data`;
+/** Load every file in one data folder, e.g. "burbank" or "burbank-sample" (task M5-7). */
+export async function loadCity(folder: string, options: LoadOptions = {}): Promise<CityData> {
+  const base = options.baseUrl ?? dataBaseUrl(currentRoute().siteRoot);
   const fetcher = options.fetcher ?? ((url: string) => fetch(url));
   const url = (file: string) => `${base}/${folder}/${file}`;
   const required = <T>(file: string) => getJson<T>(fetcher, url(file), false) as Promise<T>;
@@ -141,5 +139,5 @@ export async function loadCity(cityId: string, options: LoadOptions = {}): Promi
       optional<BlockNumbers>('blocks.json'),
     ]);
 
-  return { cityId, city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, metadata, zoning, permitZones, curbColorConfig, zoningCategories, blocks };
+  return { cityId: folder, city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, metadata, zoning, permitZones, curbColorConfig, zoningCategories, blocks };
 }

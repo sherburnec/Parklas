@@ -2,11 +2,12 @@
 // against the right segment and side. A separate entry point; the public app does not link to or import it.
 import type { GeoJSONSource, MapMouseEvent } from 'maplibre-gl';
 import { createBasemap } from '../basemap';
-import { bannerText, getDataSet, loadCity } from '../data-loader';
+import { bannerText, currentRoute, loadCity } from '../data-loader';
 import { formatCoordinates } from './coordinates';
 import { authoringSides } from './sides';
 
-const CITY_ID = 'burbank';
+// The page's own path names its data folder (task M5-7).
+const FOLDER = currentRoute().folder;
 const COLOURS = { L: '#1f6fd1', R: '#e07b00' };
 const ARROW_IMAGE = 'direction-arrow';
 const HIT_LAYER = 'authoring-hit';
@@ -17,7 +18,7 @@ const app = document.getElementById('app') as HTMLElement;
 const detail = document.getElementById('detail') as HTMLElement;
 const coords = document.getElementById('coords') as HTMLElement;
 
-const text = bannerText(getDataSet());
+const text = bannerText(FOLDER);
 if (text) {
   const banner = document.createElement('div');
   banner.id = 'data-banner';
@@ -72,7 +73,7 @@ function show(props: Record<string, unknown>, copied: boolean) {
   detail.hidden = false;
 }
 
-loadCity(CITY_ID)
+loadCity(FOLDER)
   .then(async (city) => {
     // Every segment counts as mapped here, so the basemap draws plain lines and shows no "not yet mapped" popup.
     const basemap = createBasemap(app, city.segments, city.segments.features.map((f) => f.properties.segment_id));
@@ -152,6 +153,6 @@ loadCity(CITY_ID)
   .catch((err: unknown) => {
     const message = document.createElement('p');
     message.setAttribute('role', 'alert');
-    message.textContent = `Could not load ${CITY_ID} data. ${(err as Error).message}`;
+    message.textContent = `Could not load ${FOLDER} data. ${(err as Error).message}`;
     app.append(message);
   });

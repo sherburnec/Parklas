@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { loadCity, type Fetcher } from './load-city';
 
 function fakeFetcher(files: Record<string, unknown>, seen: string[] = []): Fetcher {
@@ -23,9 +23,9 @@ const required = (folder: string) => ({
 });
 
 describe('loadCity', () => {
-  it('reads the sample folder for the sample set and returns typed data', async () => {
+  it('reads the named folder and returns typed data', async () => {
     const seen: string[] = [];
-    const data = await loadCity('burbank', { dataSet: 'sample', baseUrl: '/data', fetcher: fakeFetcher(required('burbank-sample'), seen) });
+    const data = await loadCity('burbank-sample', { baseUrl: '/data', fetcher: fakeFetcher(required('burbank-sample'), seen) });
     expect(data.city.time_zone).toBe('America/Los_Angeles');
     expect(data.coverage.segment_ids).toEqual(['a']);
     expect(data.trim.segments.a).toMatchObject({ trim_start_m: 3.4, inner_L: true });
@@ -35,43 +35,66 @@ describe('loadCity', () => {
     expect(seen.every((u) => u.startsWith('/data/burbank-sample/'))).toBe(true);
   });
 
-  it('reads the plain folder for the real set and picks up optional files', async () => {
+  it('resolves data/ from the site root, not from the page folder', async () => {
+    const seen: string[] = [];
+    vi.stubGlobal('window', { location: { pathname: '/Parklas/burbank-sample/authoring.html' } });
+    try {
+      const files = Object.fromEntries(Object.entries(required('burbank-sample')).map(([k, v]) => [`/Parklas${k}`, v]));
+      vi.stubGlobal('fetch', fakeFetcher(files, seen));
+      await loadCity('burbank-sample');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((u) => u.startsWith('/Parklas/data/burbank-sample/'))).toBe(true);
+  });
+
+  it('refuses to guess a data location from a path with no folder', async () => {
+    vi.stubGlobal('window', { location: { pathname: '/' } });
+    try {
+      await expect(loadCity('burbank')).rejects.toThrow(/data folder/i);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('reads each folder from the same data/ tree and picks up optional files', async () => {
     const files = { ...required('burbank'), '/data/burbank/zoning.geojson': empty };
-    const data = await loadCity('burbank', { dataSet: 'real', baseUrl: '/data', fetcher: fakeFetcher(files) });
+    const data = await loadCity('burbank', { baseUrl: '/data', fetcher: fakeFetcher(files) });
     expect(data.zoning).toEqual(empty);
   });
 
   it('fails with the url when a required file is missing', async () => {
     const files = required('burbank');
     delete files['/data/burbank/coverage.json'];
-    await expect(loadCity('burbank', { dataSet: 'real', baseUrl: '/data', fetcher: fakeFetcher(files) })).rejects.toThrow(/burbank\/coverage\.json.*404/);
+    await expect(loadCity('burbank', { baseUrl: '/data', fetcher: fakeFetcher(files) })).rejects.toThrow(/burbank\/coverage\.json.*404/);
   });
 
   it('fails with the url when trim.json is missing', async () => {
     const files = required('burbank');
     delete files['/data/burbank/trim.json'];
-    await expect(loadCity('burbank', { dataSet: 'real', baseUrl: '/data', fetcher: fakeFetcher(files) })).rejects.toThrow(/burbank\/trim\.json.*404/);
+    await expect(loadCity('burbank', { baseUrl: '/data', fetcher: fakeFetcher(files) })).rejects.toThrow(/burbank\/trim\.json.*404/);
   });
 
   it('fails with the url when metadata.json is missing', async () => {
     const files = required('burbank');
     delete files['/data/burbank/metadata.json'];
-    await expect(loadCity('burbank', { dataSet: 'real', baseUrl: '/data', fetcher: fakeFetcher(files) })).rejects.toThrow(/burbank\/metadata\.json.*404/);
+    await expect(loadCity('burbank', { baseUrl: '/data', fetcher: fakeFetcher(files) })).rejects.toThrow(/burbank\/metadata\.json.*404/);
   });
 
   it('reads blocks.json when the city has one, and returns null when it does not (task M5-5)', async () => {
-    const without = await loadCity('burbank', { dataSet: 'real', baseUrl: '/data', fetcher: fakeFetcher(required('burbank')) });
+    const without = await loadCity('burbank', { baseUrl: '/data', fetcher: fakeFetcher(required('burbank')) });
     expect(without.blocks).toBeNull();
     const blocks = { city_id: 'burbank', blocks: { a: 1200, b: null } };
     const files = { ...required('burbank'), '/data/burbank/blocks.json': blocks };
-    const withBlocks = await loadCity('burbank', { dataSet: 'real', baseUrl: '/data', fetcher: fakeFetcher(files) });
+    const withBlocks = await loadCity('burbank', { baseUrl: '/data', fetcher: fakeFetcher(files) });
     expect(withBlocks.blocks).toEqual(blocks);
   });
 
   it('treats an HTML answer for an optional file as absent', async () => {
     const fetcher: Fetcher = async (url) =>
       url.endsWith('zoning.geojson') ? new Response('<html>', { status: 200 }) : fakeFetcher(required('burbank'))(url);
-    const data = await loadCity('burbank', { dataSet: 'real', baseUrl: '/data', fetcher });
+    const data = await loadCity('burbank', { baseUrl: '/data', fetcher });
     expect(data.zoning).toBeNull();
   });
 });

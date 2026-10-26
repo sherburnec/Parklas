@@ -1,0 +1,4 @@
+{
+  "description": "Site-wide settings. default_folder is the data folder /authoring.html redirects to and the one marked (default) on the site root list (task M5-7). Task TD-10 changes it to burbank.",
+  "default_folder": "burbank-sample"
+}
