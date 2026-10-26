@@ -1,7 +1,7 @@
 // The click-through panel (task M4-3): both sides of the clicked block, every rule on each, from the loader's data.
 import { describeSegment } from './detail';
 import type { DetailData, DetailTime, SegmentView, SideView } from './detail';
-import { dayName } from './format';
+import { modeNote } from './format';
 
 export interface CurbDetailOptions {
   timeZone: string;
@@ -23,8 +23,6 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, classN
   return node;
 };
 
-const hourText = (hour: number): string => `${String(hour).padStart(2, '0')}:00`;
-
 function sideSection(side: SideView): HTMLElement {
   const section = el('section', undefined, 'curb-side');
   section.append(el('h3', `Side ${side.side}, ${side.grid} side (city grid)`));
@@ -43,8 +41,8 @@ function sideSection(side: SideView): HTMLElement {
     item.append(el('strong', `${r.layer}: ${r.rule}`));
     if (r.note) item.append(el('div', r.note));
     if (r.permit) item.append(el('div', r.permit));
-    item.append(el('div', `Schedule: ${r.scheduleText}${r.scheduleSource === 'default' ? " (the color's default)" : ''}`));
-    item.append(el('div', r.status));
+    item.append(el('div', `${r.scheduleLabel}: ${r.scheduleText}${r.scheduleSource === 'default' ? " (the color's default)" : ''}`));
+    if (r.status) item.append(el('div', r.status));
     list.append(item);
   }
   section.append(list);
@@ -63,7 +61,7 @@ function render(view: SegmentView, at: DetailTime, unmappedMessage: string, onCl
     root.append(el('p', unmappedMessage, 'curb-unmapped'));
     return root;
   }
-  root.append(el('p', `Next changes counted from ${dayName(at.day)} ${hourText(at.hour)}.`, 'curb-note'));
+  root.append(el('p', modeNote(at), 'curb-note'));
   for (const side of view.sides) root.append(sideSection(side));
   return root;
 }

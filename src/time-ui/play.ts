@@ -14,12 +14,15 @@ export interface Player {
   isPlaying(): boolean;
 }
 
-/** Advances the shared hour once a second while playing. `onChange` hears each start and stop. */
+/**
+ * Advances the shared hour once a second while playing. `onChange` hears each start and stop. Play only runs in
+ * hour mode: it will not start in another mode and stops the moment the mode leaves hour.
+ */
 export function createPlayer(state: AppStateStore, onChange: (playing: boolean) => void = () => {}): Player {
   let timer: ReturnType<typeof setInterval> | undefined;
   const player: Player = {
     start() {
-      if (timer !== undefined) return;
+      if (timer !== undefined || state.get().mode !== 'hour') return;
       timer = setInterval(() => state.set({ hour: nextHour(state.get().hour) }), PLAY_INTERVAL_MS);
       onChange(true);
     },
@@ -36,5 +39,8 @@ export function createPlayer(state: AppStateStore, onChange: (playing: boolean) 
     },
     isPlaying: () => timer !== undefined,
   };
+  state.subscribe((s) => {
+    if (s.mode !== 'hour') player.stop();
+  });
   return player;
 }

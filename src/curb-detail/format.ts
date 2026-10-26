@@ -1,5 +1,6 @@
 // Plain-words text for schedules and times in the click-through list (task M4-3).
-import type { Schedule, Weekday } from '../schedule-engine';
+import { windowsOnDay } from '../schedule-engine';
+import type { Schedule, TimeMode, Weekday } from '../schedule-engine';
 
 const ORDER: Weekday[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const SHORT: Record<Weekday, string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
@@ -57,4 +58,31 @@ export function statusText(
   if (next === null) return `${state}, no next change`;
   const later = next.daysLater > 0 ? ` (${next.daysLater} ${next.daysLater === 1 ? 'day' : 'days'} later)` : '';
   return `${state}, next change ${SHORT[next.weekday]} ${clockText(next.hour, next.minute)}${later}`;
+}
+
+/** Day mode: the exact hours a schedule gives on the day containing `instant`, or "Not active today". Null reads "all day". */
+export function dayWindowsText(schedule: Schedule, instant: Date, timeZone: string): string {
+  if (schedule === null) return 'all day';
+  const parts = windowsOnDay(schedule, instant, timeZone).flatMap(({ window: w, startsToday, carriesIn }) => {
+    const crosses = w.end < w.start ? ' (crosses midnight)' : '';
+    return [
+      ...(carriesIn ? [{ order: -1, text: `until ${w.end}` }] : []),
+      ...(startsToday ? [{ order: Number(w.start.slice(0, 2)) * 60 + Number(w.start.slice(3, 5)), text: `${w.start}–${w.end}${crosses}` }] : []),
+    ];
+  });
+  if (parts.length === 0) return 'Not active today';
+  // A tail carried in from yesterday comes first, then the windows that start today by start time.
+  return parts.sort((a, b) => a.order - b.order).map((p) => p.text).join(', ');
+}
+
+/** The line at the top of the list that says which time mode is on. */
+export function modeNote(at: { day: Weekday; hour: number; mode?: TimeMode }): string {
+  switch (at.mode ?? 'hour') {
+    case 'day':
+      return `Day mode: each rule’s windows on ${SHORT[at.day]}.`;
+    case 'all':
+      return 'All times mode: each rule’s full schedule.';
+    default:
+      return `Hour mode: next changes counted from ${SHORT[at.day]} ${clockText(at.hour, 0)}.`;
+  }
 }

@@ -1,21 +1,22 @@
 // What the click-through list says about a segment (task M4-3). Pure: it reads the loader's rule rows, never
 // what the layers drew, so inner-facing sides and skipped slivers list their rules like any other side.
 import type { CityData, Side, SideCollection } from '../data-loader';
-import { instantFor, isActive, localParts, nextChange } from '../schedule-engine';
-import type { Schedule, Weekday } from '../schedule-engine';
+import { instantFor, isActive, isActiveOnDay, localParts, nextChange } from '../schedule-engine';
+import type { Schedule, TimeMode, Weekday } from '../schedule-engine';
 import { gridSide } from './grid';
 import type { GridSide } from './grid';
-import { blockHeading, scheduleText, statusText } from './format';
+import { blockHeading, dayName, dayWindowsText, scheduleText, statusText } from './format';
 
 export type DetailData = Pick<
   CityData,
   'segments' | 'sweeping' | 'timedParking' | 'restrictions' | 'curbColors' | 'coverage' | 'trim' | 'curbColorConfig' | 'blocks'
 >;
 
-/** The chosen day and hour, from the shared state. */
+/** The chosen day and hour, and the time mode (absent means 'hour'), from the shared state. */
 export interface DetailTime {
   day: Weekday;
   hour: number;
+  mode?: TimeMode;
 }
 
 export interface RuleView {
@@ -26,11 +27,16 @@ export interface RuleView {
   note: string | null;
   /** "Zone C permit exempt" or "Zone C permit required"; null when the row has no permit code. */
   permit: string | null;
-  /** Exact windows, from the row's own schedule or, for a curb color without one, the color's default. */
+  /** Names what scheduleText holds: "Schedule" for the full schedule, or the day in Day mode. */
+  scheduleLabel: string;
+  /**
+   * Hour and All times: the exact windows, from the row's own schedule or, for a curb color without one, the
+   * color's default. Day: the windows on the chosen day, or "Not active today".
+   */
   scheduleText: string;
   scheduleSource: 'own' | 'default';
   active: boolean;
-  /** "Active, next change Tue 10:30" and so on, counted from the chosen hour. */
+  /** "Active, next change Tue 10:30" and so on, counted from the chosen hour. Empty in Day and All times. */
   status: string;
 }
 
@@ -134,26 +140,33 @@ export function describeSegment(data: DetailData, segmentId: string, at: DetailT
   const segment = data.segments.features.find((f) => f.properties.segment_id === segmentId);
   if (!segment) throw new Error(`Unknown segment ${segmentId}`);
   const props = segment.properties as Record<string, unknown>;
+  const mode = at.mode ?? 'hour';
   const instant = instantFor(at.day, at.hour, timeZone);
+  const dayStart = instantFor(at.day, 0, timeZone);
   const here = localParts(instant, timeZone);
   const trim = data.trim.segments[segmentId];
 
   const sides = SIDES.map((side): SideView => {
     const rules = rawRules(data, segmentId, side).map((r): RuleView => {
+      const base = { layer: r.layer, rule: r.rule, note: r.note ?? null, permit: r.permit ?? null, scheduleSource: r.source ?? 'own' } as const;
+      if (mode === 'all') {
+        // Every rule is drawn as active whatever its schedule, so the list shows the schedule and no state.
+        return { ...base, scheduleLabel: 'Schedule', scheduleText: scheduleText(r.schedule), active: true, status: '' };
+      }
+      if (mode === 'day') {
+        return {
+          ...base,
+          scheduleLabel: dayName(at.day),
+          scheduleText: dayWindowsText(r.schedule, dayStart, timeZone),
+          active: isActiveOnDay(r.schedule, dayStart, timeZone),
+          status: '',
+        };
+      }
       const active = isActive(r.schedule, instant, timeZone);
       const change = nextChange(r.schedule, instant, timeZone);
       const parts = change ? localParts(change, timeZone) : null;
       const next = parts && { ...parts, daysLater: parts.dayNumber - here.dayNumber };
-      return {
-        layer: r.layer,
-        rule: r.rule,
-        note: r.note ?? null,
-        permit: r.permit ?? null,
-        scheduleText: scheduleText(r.schedule),
-        scheduleSource: r.source ?? 'own',
-        active,
-        status: statusText(active, next),
-      };
+      return { ...base, scheduleLabel: 'Schedule', scheduleText: scheduleText(r.schedule), active, status: statusText(active, next) };
     });
     const zones = [data.sweeping, data.timedParking, data.restrictions, data.curbColors]
       .flatMap((c) => c.features)

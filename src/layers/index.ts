@@ -27,7 +27,7 @@ export type { PermitZoneLegendEntry } from './permit-zones';
 export { bandOffsetPx, bandWidthPx, layoutBands } from './bands';
 export type { BandLayout, HiddenBand } from './bands';
 export { filterByZone } from './zone-filter';
-export { sweepingStyle } from './sweeping';
+export { isScheduleActive, sweepingStyle } from './sweeping';
 export type { TimeSelection } from './sweeping';
 export { UNKNOWN_ZONE_HEX, zoningLegend, zoningStyle } from './zoning';
 export type { LegendEntry } from './zoning';

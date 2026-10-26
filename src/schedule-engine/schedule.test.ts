@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { instantFor, isActive, localDayHour, localParts, nextChange } from './index';
+import { instantFor, isActive, isActiveOnDay, localDayHour, localParts, nextChange, windowsOnDay } from './index';
 import type { Schedule } from './index';
 
 // All instants are written in UTC. Burbank is UTC-8 (PST) until 2026-03-08
@@ -283,5 +283,118 @@ describe('localParts', () => {
     const before = localParts(at('2026-03-07T20:00:00Z'));
     const after = localParts(at('2026-03-09T20:00:00Z'));
     expect(after.dayNumber - before.dayNumber).toBe(2);
+  });
+});
+
+describe('isActiveOnDay (any minute of the local day)', () => {
+  // Jan 5 2026 is a Monday. 20:00Z is noon PST, safely inside the local day.
+  const day = (date: string) => at(`${date}T20:00:00Z`);
+  const monNight: Schedule = { windows: [{ days: ['mon'], start: '18:00', end: '06:00' }] };
+
+  it('Mon 18:00 to 06:00 is active on Mon and Tue but not Wed (or Sun)', () => {
+    expect(isActiveOnDay(monNight, day('2026-01-05'))).toBe(true); // Mon: starts 18:00
+    expect(isActiveOnDay(monNight, day('2026-01-06'))).toBe(true); // Tue: runs to 06:00
+    expect(isActiveOnDay(monNight, day('2026-01-07'))).toBe(false); // Wed
+    expect(isActiveOnDay(monNight, day('2026-01-04'))).toBe(false); // Sun
+  });
+
+  it('a window on another day only is not active on this day', () => {
+    const s: Schedule = { windows: [{ days: ['fri'], start: '08:00', end: '10:00' }] };
+    expect(isActiveOnDay(s, day('2026-01-05'))).toBe(false);
+    expect(isActiveOnDay(s, day('2026-01-09'))).toBe(true);
+  });
+
+  it('a same-day window does not spill into the next day', () => {
+    const s: Schedule = { windows: [{ days: ['mon'], start: '08:00', end: '10:00' }] };
+    expect(isActiveOnDay(s, day('2026-01-05'))).toBe(true);
+    expect(isActiveOnDay(s, day('2026-01-06'))).toBe(false);
+  });
+
+  it('a window ending exactly at midnight does not reach the next day', () => {
+    const s: Schedule = { windows: [{ days: ['mon'], start: '22:00', end: '00:00' }] };
+    expect(isActiveOnDay(s, day('2026-01-05'))).toBe(true);
+    expect(isActiveOnDay(s, day('2026-01-06'))).toBe(false);
+  });
+
+  it('Sunday into Monday', () => {
+    const s: Schedule = { windows: [{ days: ['sun'], start: '22:00', end: '02:00' }] };
+    expect(isActiveOnDay(s, day('2026-01-11'))).toBe(true); // Sun
+    expect(isActiveOnDay(s, day('2026-01-12'))).toBe(true); // Mon
+    expect(isActiveOnDay(s, day('2026-01-13'))).toBe(false); // Tue
+  });
+
+  it('null is active on every day, and an empty schedule on none', () => {
+    expect(isActiveOnDay(null, day('2026-01-05'))).toBe(true);
+    expect(isActiveOnDay({ windows: [] }, day('2026-01-05'))).toBe(false);
+    expect(isActiveOnDay({ windows: [{ days: [], start: '08:00', end: '17:00' }] }, day('2026-01-05'))).toBe(false);
+  });
+
+  it('reads the local day on the given zone, not the UTC day', () => {
+    const s: Schedule = { windows: [{ days: ['mon'], start: '08:00', end: '10:00' }] };
+    // 2026-01-06T03:00Z is still Monday 19:00 in Los Angeles but Tuesday in UTC.
+    expect(isActiveOnDay(s, at('2026-01-06T03:00:00Z'))).toBe(true);
+    expect(isActiveOnDay(s, at('2026-01-06T03:00:00Z'), 'UTC')).toBe(false);
+  });
+
+  describe('week of month', () => {
+    const firstThird: Schedule = { windows: [{ days: ['mon'], start: '08:00', end: '10:00', weeks_of_month: [1, 3] }] };
+    it('is active only on the listed weeks, as isActive is', () => {
+      expect(isActiveOnDay(firstThird, day('2026-01-05'))).toBe(true); // week 1
+      expect(isActiveOnDay(firstThird, day('2026-01-12'))).toBe(false); // week 2
+      expect(isActiveOnDay(firstThird, day('2026-01-19'))).toBe(true); // week 3
+      expect(isActiveOnDay(firstThird, day('2026-01-26'))).toBe(false); // week 4
+    });
+
+    it('a crossing window takes its week from the day it starts', () => {
+      // Sat 22:00 to Sun 06:00, week 1 only: Sat Jan 3 starts it, Sun Jan 4 carries it.
+      const s: Schedule = { windows: [{ days: ['sat'], start: '22:00', end: '06:00', weeks_of_month: [1] }] };
+      expect(isActiveOnDay(s, day('2026-01-03'))).toBe(true);
+      expect(isActiveOnDay(s, day('2026-01-04'))).toBe(true);
+      expect(isActiveOnDay(s, day('2026-01-10'))).toBe(false); // Sat, week 2
+      expect(isActiveOnDay(s, day('2026-01-11'))).toBe(false); // Sun after it
+    });
+
+    it('a window that crosses a month end follows the start day', () => {
+      // Sat Jan 31 is week 5; the tail falls on Sun Feb 1.
+      const s: Schedule = { windows: [{ days: ['sat'], start: '22:00', end: '06:00', weeks_of_month: [5] }] };
+      expect(isActiveOnDay(s, day('2026-01-31'))).toBe(true);
+      expect(isActiveOnDay(s, day('2026-02-01'))).toBe(true);
+    });
+  });
+
+  it('agrees with isActive sampled every 30 minutes across four weeks', () => {
+    const s: Schedule = {
+      windows: [
+        { days: ['mon', 'thu'], start: '18:00', end: '06:00', weeks_of_month: [1, 2] },
+        { days: ['sat'], start: '09:00', end: '09:30' },
+        { days: ['sun'], start: '23:30', end: '00:30' },
+      ],
+    };
+    for (let d = 0; d < 28; d++) {
+      const localMidnight = Date.UTC(2026, 0, 1 + d, 8); // PST is UTC-8 all of January
+      let any = false;
+      for (let m = 0; m < 24 * 60; m += 30) any ||= isActive(s, new Date(localMidnight + m * 60_000));
+      expect(isActiveOnDay(s, new Date(localMidnight + 12 * 3_600_000))).toBe(any);
+    }
+  });
+});
+
+describe('windowsOnDay', () => {
+  const day = (date: string) => at(`${date}T20:00:00Z`);
+  const monNight: Schedule = { windows: [{ days: ['mon'], start: '18:00', end: '06:00' }] };
+
+  it('separates a window that starts on the day from one carried in from the day before', () => {
+    expect(windowsOnDay(monNight, day('2026-01-05')).map((x) => [x.startsToday, x.carriesIn])).toEqual([[true, false]]);
+    expect(windowsOnDay(monNight, day('2026-01-06')).map((x) => [x.startsToday, x.carriesIn])).toEqual([[false, true]]);
+    expect(windowsOnDay(monNight, day('2026-01-07'))).toEqual([]);
+  });
+
+  it('a window on consecutive days both starts and carries in', () => {
+    const s: Schedule = { windows: [{ days: ['mon', 'tue'], start: '22:00', end: '02:00' }] };
+    expect(windowsOnDay(s, day('2026-01-06')).map((x) => [x.startsToday, x.carriesIn])).toEqual([[true, true]]);
+  });
+
+  it('is empty for null, which the caller reads as all day', () => {
+    expect(windowsOnDay(null, day('2026-01-05'))).toEqual([]);
   });
 });

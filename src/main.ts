@@ -108,8 +108,8 @@ loadCity(FOLDER)
     // Every layer reads the one state: a change to it restyles them all.
     let shown: AppState = initial;
     const apply = (next: AppState, force: boolean): void => {
-      if (force || next.day !== shown.day || next.hour !== shown.hour || next.zone !== shown.zone) {
-        for (const update of timeUpdates) update({ day: next.day, hour: next.hour, zone: next.zone });
+      if (force || next.day !== shown.day || next.hour !== shown.hour || next.mode !== shown.mode || next.zone !== shown.zone) {
+        for (const update of timeUpdates) update({ day: next.day, hour: next.hour, mode: next.mode, zone: next.zone });
       }
       if (force || next.zone !== shown.zone) {
         highlightZone(next.zone === ZONE_ALL || next.zone === ZONE_NONE ? null : next.zone);

@@ -110,3 +110,50 @@ describe('createAppState', () => {
     expect(fn).not.toHaveBeenCalled();
   });
 });
+
+describe('time mode (task M5-8)', () => {
+  it('defaults to hour, and an absent mode means hour', () => {
+    expect(DEFAULT_STATE.mode).toBe('hour');
+    expect(parseSearch('').mode).toBe('hour');
+    expect(parseSearch('?day=tue&hour=3').mode).toBe('hour');
+  });
+
+  it('reads mode=day and mode=all', () => {
+    expect(parseSearch('?mode=day').mode).toBe('day');
+    expect(parseSearch('?mode=all').mode).toBe('all');
+  });
+
+  it('falls back to hour for a bad value', () => {
+    for (const bad of ['?mode=week', '?mode=', '?mode=DAY', '?mode=hour,day']) expect(parseSearch(bad).mode).toBe('hour');
+  });
+
+  it('writes mode only when it is day or all', () => {
+    const base = createAppState().get();
+    expect(new URLSearchParams(toSearch(base, '')).has('mode')).toBe(false);
+    expect(new URLSearchParams(toSearch({ ...base, mode: 'day' }, '')).get('mode')).toBe('day');
+    expect(new URLSearchParams(toSearch({ ...base, mode: 'all' }, '')).get('mode')).toBe('all');
+    expect(new URLSearchParams(toSearch(base, '?mode=all')).has('mode')).toBe(false);
+  });
+
+  it('round-trips through the URL, so the mode survives a reload', () => {
+    const base = createAppState().get();
+    for (const mode of ['hour', 'day', 'all'] as const) {
+      expect(parseSearch(toSearch({ ...base, day: 'sat', hour: 21, mode }, '')).mode).toBe(mode);
+    }
+  });
+
+  it('is changed through set, notifies once, ignores a repeat, and keeps the day and hour', () => {
+    const state = createAppState('?day=wed&hour=14');
+    const fn = vi.fn();
+    state.subscribe(fn);
+    state.set({ mode: 'day' });
+    state.set({ mode: 'day' });
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(state.get()).toMatchObject({ mode: 'day', day: 'wed', hour: 14 });
+  });
+
+  it('rejects a mode that is not hour, day or all', () => {
+    const state = createAppState('');
+    expect(() => state.set({ mode: 'week' as never })).toThrow();
+  });
+});

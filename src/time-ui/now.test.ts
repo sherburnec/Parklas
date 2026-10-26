@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { currentDayHour } from './now';
+import { currentDayHour, nowSelection } from './now';
+import { createAppState } from './state';
 
 afterEach(() => vi.useRealTimers());
 
@@ -35,5 +36,23 @@ describe('currentDayHour (the Now button)', () => {
     expect(nowAt('2026-03-09T07:00:00Z')).toEqual({ day: 'mon', hour: 0 });
     expect(nowAt('2026-11-02T07:59:00Z')).toEqual({ day: 'sun', hour: 23 }); // 23:59 PST
     expect(nowAt('2026-11-02T08:00:00Z')).toEqual({ day: 'mon', hour: 0 });
+  });
+});
+
+describe('nowSelection (the Now button, task M5-8)', () => {
+  it('returns to hour mode along with the current day and hour', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-05T16:45:00Z'));
+    expect(nowSelection('America/Los_Angeles')).toEqual({ day: 'mon', hour: 8, mode: 'hour' });
+  });
+
+  it('applied to the state, switches day and all-times modes back to hour', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-05T16:45:00Z'));
+    for (const mode of ['day', 'all']) {
+      const state = createAppState(`?day=sat&hour=2&mode=${mode}`);
+      state.set(nowSelection('America/Los_Angeles'));
+      expect(state.get()).toMatchObject({ day: 'mon', hour: 8, mode: 'hour' });
+    }
   });
 });

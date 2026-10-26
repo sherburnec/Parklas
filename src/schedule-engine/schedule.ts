@@ -126,6 +126,51 @@ export function isActive(
   return schedule.windows.some((w) => windowActive(w, local, yesterday));
 }
 
+export interface DayWindow {
+  window: ScheduleWindow;
+  /** The window starts on this day (its weekday and week of month match). */
+  startsToday: boolean;
+  /** The window began the day before and is still running after midnight. */
+  carriesIn: boolean;
+}
+
+/**
+ * The windows with any minute on the local day that contains dateTime, each marked as starting that day, carried
+ * in from the day before, or both. Week of month comes from the day a window starts, as in isActive. A null
+ * schedule has no windows to list; callers read it as all day.
+ */
+export function windowsOnDay(
+  schedule: Schedule,
+  dateTime: Date,
+  timeZone: string = DEFAULT_TIME_ZONE,
+): DayWindow[] {
+  if (schedule === null) return [];
+  const { local } = wallClock(dateTime, timeZone);
+  const yesterday = wallClock(new Date(Date.UTC(local.year, local.month - 1, local.day - 1, 12)), 'UTC').local;
+  const out: DayWindow[] = [];
+  for (const window of schedule.windows) {
+    const start = parseTime(window.start);
+    const end = parseTime(window.end);
+    const startsToday = startsOn(window, local.weekday, local.day);
+    // Only a crossing window reaches into the next day, and one ending at exactly 00:00 reaches no minute of it.
+    const carriesIn = start >= end && end > 0 && startsOn(window, yesterday.weekday, yesterday.day);
+    if (startsToday || carriesIn) out.push({ window, startsToday, carriesIn });
+  }
+  return out;
+}
+
+/**
+ * Is the rule in force at any minute of the local day that contains dateTime? Counts a window that began the
+ * day before and runs past midnight; null is always in force.
+ */
+export function isActiveOnDay(
+  schedule: Schedule,
+  dateTime: Date,
+  timeZone: string = DEFAULT_TIME_ZONE,
+): boolean {
+  return schedule === null || windowsOnDay(schedule, dateTime, timeZone).length > 0;
+}
+
 /**
  * The first instant after dateTime at which the rule turns on or off, or null
  * if it never changes (always in force, never in force, or no change within

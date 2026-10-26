@@ -58,3 +58,43 @@ describe('createPlayer', () => {
     player.stop();
   });
 });
+
+describe('play and the time mode (task M5-8)', () => {
+  it('stops when the mode leaves hour, and does not move the hour again', () => {
+    const state = createAppState('?day=tue&hour=8');
+    const changes = vi.fn();
+    const player = createPlayer(state, changes);
+    player.start();
+    vi.advanceTimersByTime(1000);
+    state.set({ mode: 'day' });
+    expect(player.isPlaying()).toBe(false);
+    expect(changes).toHaveBeenLastCalledWith(false);
+    vi.advanceTimersByTime(5000);
+    expect(state.get().hour).toBe(9);
+  });
+
+  it('stops when the mode goes to all times', () => {
+    const state = createAppState('?hour=8');
+    const player = createPlayer(state);
+    player.start();
+    state.set({ mode: 'all' });
+    expect(player.isPlaying()).toBe(false);
+  });
+
+  it('does not start outside hour mode', () => {
+    const state = createAppState('?hour=8&mode=day');
+    const player = createPlayer(state);
+    expect(player.toggle()).toBe(false);
+    vi.advanceTimersByTime(3000);
+    expect(state.get().hour).toBe(8);
+  });
+
+  it('keeps playing when something else changes', () => {
+    const state = createAppState('?hour=8');
+    const player = createPlayer(state);
+    player.start();
+    state.set({ day: 'fri' });
+    expect(player.isPlaying()).toBe(true);
+    player.stop();
+  });
+});

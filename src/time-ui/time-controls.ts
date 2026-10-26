@@ -1,4 +1,6 @@
-import { currentDayHour } from './now';
+import { TIME_MODES } from '../schedule-engine';
+import type { TimeMode } from '../schedule-engine';
+import { nowSelection } from './now';
 import { createPlayer } from './play';
 import { WEEKDAYS } from './state';
 import type { AppState, AppStateStore } from './state';
@@ -18,13 +20,23 @@ export function formatHour(hour: number): string {
   return `${hour % 12 === 0 ? 12 : hour % 12}:00 ${hour < 12 ? 'AM' : 'PM'}`;
 }
 
-/** "Monday 8:00 AM". */
-export function formatSelection(s: Pick<AppState, 'day' | 'hour'>): string {
+export const MODE_LABELS: Record<TimeMode, string> = { hour: 'Hour', day: 'Day', all: 'All times' };
+
+/** Which controls work in a mode: Day turns off the slider and play, All times also the day picker. */
+export function controlsEnabled(mode: TimeMode): { day: boolean; slider: boolean; play: boolean } {
+  return { day: mode !== 'all', slider: mode === 'hour', play: mode === 'hour' };
+}
+
+/** "Monday 8:00 AM" in Hour mode, "Tuesday, all day" in Day mode, "All times" in All times mode. */
+export function formatSelection(s: Pick<AppState, 'day' | 'hour'> & { mode?: TimeMode }): string {
+  if (s.mode === 'all') return MODE_LABELS.all;
+  if (s.mode === 'day') return `${DAY_NAMES[s.day].long}, all day`;
   return `${DAY_NAMES[s.day].long} ${formatHour(s.hour)}`;
 }
 
 /**
- * Day picker (Monday to Sunday), hourly slider, Now and play, all reading and writing the shared state.
+ * Time mode (Hour, Day, All times), day picker (Monday to Sunday), hourly slider, Now and play, all reading and
+ * writing the shared state.
  * `timeZone` is the city's, so Now follows Burbank time whatever the device clock says.
  */
 export function createTimeControls(parent: HTMLElement, state: AppStateStore, timeZone: string): void {
@@ -35,6 +47,20 @@ export function createTimeControls(parent: HTMLElement, state: AppStateStore, ti
   const readout = document.createElement('output');
   readout.className = 'time-readout';
   readout.setAttribute('aria-live', 'polite');
+
+  const modes = document.createElement('div');
+  modes.className = 'mode-picker';
+  modes.setAttribute('role', 'group');
+  modes.setAttribute('aria-label', 'Time mode');
+  const modeButtons = new Map<TimeMode, HTMLButtonElement>();
+  for (const mode of TIME_MODES) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = MODE_LABELS[mode];
+    button.addEventListener('click', () => state.set({ mode }));
+    modeButtons.set(mode, button);
+    modes.append(button);
+  }
 
   const days = document.createElement('div');
   days.className = 'day-picker';
@@ -72,22 +98,27 @@ export function createTimeControls(parent: HTMLElement, state: AppStateStore, ti
   const now = document.createElement('button');
   now.type = 'button';
   now.textContent = 'Now';
-  now.title = `Jump to the current day and hour in ${timeZone}`;
+  now.title = `Jump to the current day and hour in ${timeZone}, in Hour mode`;
   now.addEventListener('click', () => {
     player.stop();
-    state.set(currentDayHour(timeZone));
+    state.set(nowSelection(timeZone));
   });
 
   const row = document.createElement('div');
   row.className = 'time-row';
   row.append(now, play, slider);
-  panel.append(readout, days, row);
+  panel.append(readout, modes, days, row);
 
   const show = (s: AppState): void => {
     readout.textContent = formatSelection(s);
     slider.value = String(s.hour);
     slider.setAttribute('aria-valuetext', formatHour(s.hour));
     for (const [day, button] of dayButtons) button.setAttribute('aria-pressed', String(day === s.day));
+    for (const [mode, button] of modeButtons) button.setAttribute('aria-pressed', String(mode === s.mode));
+    const enabled = controlsEnabled(s.mode);
+    for (const button of dayButtons.values()) button.disabled = !enabled.day;
+    slider.disabled = !enabled.slider;
+    play.disabled = !enabled.play;
   };
   show(state.get());
   state.subscribe(show);
