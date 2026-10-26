@@ -53,6 +53,7 @@ loadCity(FOLDER)
     const zone = city.city.time_zone;
     createTimeControls(controls, state, zone);
     const toggles: Partial<Record<LayerKey, (visible: boolean) => void>> = {};
+    let curbClicked = false;
     const timeUpdates: Array<(at: TimeSelection) => void> = [];
 
     const { zoning, zoningCategories, permitZones, curbColorConfig } = city;
@@ -60,11 +61,28 @@ loadCity(FOLDER)
       toggles.zoning = drawZoning(basemap.map, zoning, zoningCategories, basemap.underStreetsLayerId, legends).setVisible;
     }
     let highlightZone: (code: string | null) => void = () => {};
+    let isolateZone: (zone: string, animate: boolean) => void = () => {};
     if (permitZones) {
       // After zoning, so the permit zones sit above it; both stay under the street lines and every band.
-      const zones = drawPermitZones(basemap.map, permitZones, basemap.underStreetsLayerId, controls);
+      // The legend, a click on a polygon and the selector all set the one shared zone (M5-9).
+      const zones = drawPermitZones(basemap.map, permitZones, basemap.underStreetsLayerId, controls, {
+        onSelect: (code) => state.set({ zone: code }),
+        bounds: city.permitZoneBounds,
+        maskBeforeLayerId: basemap.underLabelsLayerId,
+      });
       toggles.permit_zones = zones.setVisible;
       highlightZone = zones.highlight;
+      isolateZone = (zone, animate) => zones.isolate(zone, animate);
+      // A click on a curb opens its detail and never changes the zone: the basemap reports a block hit first
+      // (its click listener was added before this one), and this listener then skips that click.
+      basemap.map.on('click', (e) => {
+        if (curbClicked) {
+          curbClicked = false;
+          return;
+        }
+        const code = zones.codeAt(e.point);
+        if (code !== null) state.set({ zone: code });
+      });
       // Zone filter (M4-5): the selector lists the codes in the permit zones file.
       createZoneFilter(controls, state, permitZoneLegend(permitZones).map((e) => e.code));
     } else if (state.get().zone !== ZONE_ALL) {
@@ -93,7 +111,10 @@ loadCity(FOLDER)
 
     // Clicking a block lists every rule on both its sides, from the loaded rows rather than what is drawn (M4-3).
     const detail = createCurbDetail(detailHost, city, { timeZone: zone, unmappedMessage: UNMAPPED_MESSAGE, state });
-    basemap.onSegmentClick((segmentId) => detail.show(segmentId));
+    basemap.onSegmentClick((segmentId) => {
+      curbClicked = true;
+      detail.show(segmentId);
+    });
 
     // Timed parking in force on the chosen day; picking one centres the map and opens its block (M4-4).
     createDayZones(controls, city, {
@@ -113,6 +134,8 @@ loadCity(FOLDER)
       }
       if (force || next.zone !== shown.zone) {
         highlightZone(next.zone === ZONE_ALL || next.zone === ZONE_NONE ? null : next.zone);
+        // The first draw jumps to a zone from a link; later changes glide.
+        isolateZone(next.zone, !force);
       }
       for (const key of LAYER_KEYS) {
         if (force || next.visible[key] !== shown.visible[key]) toggles[key]?.(next.visible[key]);

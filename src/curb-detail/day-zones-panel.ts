@@ -1,14 +1,12 @@
-// The "zones for the day" panel (task M4-4): timed parking in force on the shared day, click one to centre the map.
+// The "active zones" panel (task M4-4, renamed in M5-9): timed parking in force on the shared day, click one to centre the map.
 import type { SegmentCollection, SideCollection } from '../data-loader';
-import type { Weekday } from '../schedule-engine';
-import { zonesForDay } from './day-zones';
-import type { DayZone } from './day-zones';
-import { dayName } from './format';
+import { activeZones, activeZonesHeading } from './day-zones';
+import type { ActiveZonesSelection, DayZone } from './day-zones';
 
 export interface DayZonesOptions {
   timeZone: string;
-  /** The shared day; the list is rebuilt when it changes. */
-  state: { get(): { day: Weekday }; subscribe(listener: (s: { day: Weekday }) => void): () => void };
+  /** The shared selection; the list is rebuilt when its day, hour, mode or zone changes. */
+  state: { get(): ActiveZonesSelection; subscribe(listener: (s: ActiveZonesSelection) => void): () => void };
   /** Called with the chosen zone; the caller moves the map (this module never touches it). */
   onSelect(zone: DayZone): void;
 }
@@ -25,17 +23,18 @@ export function createDayZones(
   panel.append(summary, list);
   container.append(panel);
 
-  let shown: Weekday | null = null;
+  let shown = '';
   const draw = (): void => {
-    const { day } = options.state.get();
-    if (day === shown) return;
-    shown = day;
-    const zones = zonesForDay(data.timedParking, data.segments, day, options.timeZone);
-    summary.textContent = `Zones for the day: ${dayName(day)} (${zones.length})`;
+    const at = options.state.get();
+    const key = [at.day, at.hour, at.mode ?? 'hour', at.zone ?? 'all'].join('|');
+    if (key === shown) return;
+    shown = key;
+    const zones = activeZones(data.timedParking, data.segments, at, options.timeZone);
+    summary.textContent = activeZonesHeading(at, zones.length);
     list.replaceChildren();
     if (zones.length === 0) {
       const none = document.createElement('li');
-      none.textContent = 'No timed parking in force on this day.';
+      none.textContent = 'No timed parking in force for this selection.';
       list.append(none);
       return;
     }

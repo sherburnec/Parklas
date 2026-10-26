@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { SegmentCollection, SideCollection } from '../data-loader';
 import { instantFor, isActive } from '../schedule-engine';
 import type { Schedule, Weekday } from '../schedule-engine';
-import { zonesForDay } from './day-zones';
+import { activeZones, activeZonesHeading } from './day-zones';
+
+const zonesForDay = (t: SideCollection, sg: SegmentCollection, day: Weekday, tz: string) => activeZones(t, sg, { day, hour: 12, mode: 'day' }, tz);
 
 const ZONE = 'America/Los_Angeles';
 const DAYS: Weekday[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -24,7 +26,7 @@ const win = (days: Weekday[], start: string, end: string) => ({ windows: [{ days
 
 const timed = (...features: ReturnType<typeof row>[]) => ({ type: 'FeatureCollection', features }) as unknown as SideCollection;
 
-describe('zonesForDay', () => {
+describe('activeZones in Day mode', () => {
   const parking = timed(
     row('s1', 'L', 120, win(['mon', 'tue', 'wed', 'thu', 'fri', 'sat'], '08:00', '18:00')),
     row('s1', 'R', 60, win(['sat', 'sun'], '09:00', '17:00'), 'C'),
@@ -79,5 +81,49 @@ describe('zonesForDay', () => {
       const got = zonesForDay(set, segments, day, ZONE).map((z) => z.limit);
       expect(got.sort()).toEqual(expected.sort());
     }
+  });
+});
+
+const zoned = (r: ReturnType<typeof row>, permit_zone: string | null) => ({ ...r, properties: { ...r.properties, permit_zone } });
+
+describe('activeZones follows the hour, the mode and the zone', () => {
+  const set = timed(
+    row('s1', 'L', 120, win(['mon'], '08:00', '12:00')),
+    row('s1', 'R', 60, win(['mon'], '14:00', '18:00')),
+    row('s2', 'L', 240, null),
+  );
+  const at = (hour: number, mode: 'hour' | 'day' | 'all' = 'hour', zone = 'all') => ({ day: 'mon' as Weekday, hour, mode, zone });
+  const limits = (a: ReturnType<typeof at>, t = set) => activeZones(t, segments, a, ZONE).map((z) => z.limit).sort();
+
+  it('lists only rows in force at the chosen hour in Hour mode, and changes with the hour', () => {
+    expect(limits(at(9))).toEqual(['2 hour limit', '4 hour limit']);
+    expect(limits(at(15))).toEqual(['1 hour limit', '4 hour limit']);
+    expect(limits(at(13))).toEqual(['4 hour limit']);
+  });
+
+  it('keeps the hour out of it in Day mode, and lists every row in All times mode', () => {
+    expect(limits(at(3, 'day'))).toEqual(['1 hour limit', '2 hour limit', '4 hour limit']);
+    expect(limits(at(3, 'all'), timed(...(set.features as unknown as ReturnType<typeof row>[]), row('s2', 'R', 30, win(['sun'], '01:00', '02:00'))))).toHaveLength(4);
+  });
+
+  it('shows the full schedule in All times mode and the day hours otherwise', () => {
+    const all = activeZones(set, segments, at(9, 'all'), ZONE).find((z) => z.limit === '2 hour limit');
+    expect(all?.hours).toBe('Mon 08:00–12:00');
+    expect(activeZones(set, segments, at(9), ZONE).find((z) => z.limit === '2 hour limit')?.hours).toBe('08:00–12:00');
+  });
+
+  it('limits the list to the chosen permit zone, or to rows outside every zone', () => {
+    const z = timed(zoned(row('s1', 'L', 120, null), 'C'), zoned(row('s1', 'R', 60, null), 'D'), zoned(row('s2', 'L', 240, null), null));
+    expect(limits(at(9, 'hour', 'C'), z)).toEqual(['2 hour limit']);
+    expect(limits(at(9, 'hour', 'none'), z)).toEqual(['4 hour limit']);
+    expect(limits(at(9, 'hour', 'all'), z)).toHaveLength(3);
+  });
+
+  it('words the heading by mode and zone', () => {
+    expect(activeZonesHeading(at(8), 3)).toBe('Active zones: Mon 08:00 (3)');
+    expect(activeZonesHeading(at(8, 'day'), 3)).toBe('Active zones: Mon, any time that day (3)');
+    expect(activeZonesHeading(at(8, 'all'), 3)).toBe('Active zones: all times (3)');
+    expect(activeZonesHeading(at(8, 'hour', 'C'), 1)).toBe('Active zones: Mon 08:00, Zone C (1)');
+    expect(activeZonesHeading(at(8, 'hour', 'none'), 0)).toBe('Active zones: Mon 08:00, outside permit zones (0)');
   });
 });

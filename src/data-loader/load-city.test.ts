@@ -91,6 +91,15 @@ describe('loadCity', () => {
     expect(withBlocks.blocks).toEqual(blocks);
   });
 
+  it('reads permit-zone-bounds.json when the city has one, and returns null when it does not (task M5-9)', async () => {
+    const without = await loadCity('burbank', { baseUrl: '/data', fetcher: fakeFetcher(required('burbank')) });
+    expect(without.permitZoneBounds).toBeNull();
+    const bounds = { city_id: 'burbank', zones: { C: { bounds: [0, 0, 1, 1], mask: { type: 'Polygon', coordinates: [] } } } };
+    const files = { ...required('burbank'), '/data/burbank/permit-zone-bounds.json': bounds };
+    const withBounds = await loadCity('burbank', { baseUrl: '/data', fetcher: fakeFetcher(files) });
+    expect(withBounds.permitZoneBounds).toEqual(bounds);
+  });
+
   it('treats an HTML answer for an optional file as absent', async () => {
     const fetcher: Fetcher = async (url) =>
       url.endsWith('zoning.geojson') ? new Response('<html>', { status: 200 }) : fakeFetcher(required('burbank'))(url);

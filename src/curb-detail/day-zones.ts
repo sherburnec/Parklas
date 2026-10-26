@@ -1,8 +1,10 @@
-// "Zones for the day" (task M4-4): the timed parking rows in force on the chosen day. Pure: it reads the
-// loader's timed parking rows, so the list matches the CSV rows for that day, drawn or not.
+// "Active zones" (task M4-4, made to follow the hour, time mode and zone filter in M5-9): the timed parking rows in
+// force under the shared selection. Pure: it reads the loader's timed parking rows, so the list matches the CSV rows,
+// drawn or not, and it asks the layers' own activity check so it agrees with the map.
 import type { SegmentCollection, Side, SideCollection } from '../data-loader';
-import { instantFor, isActive } from '../schedule-engine';
-import type { Schedule, ScheduleWindow, Weekday } from '../schedule-engine';
+import { filterByZone, isScheduleActive } from '../layers';
+import type { Schedule, ScheduleWindow, TimeMode, Weekday } from '../schedule-engine';
+import { clockText, dayName, scheduleText } from './format';
 
 export interface DayZone {
   segmentId: string;
@@ -21,21 +23,8 @@ export interface DayZone {
 const WEEK: Weekday[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const before = (day: Weekday): Weekday => WEEK[(WEEK.indexOf(day) + 6) % 7];
 
-const minutesOf = (hhmm: string): number => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
-
 const limitText = (minutes: unknown): string =>
   typeof minutes !== 'number' ? 'Timed parking' : minutes % 60 === 0 ? `${minutes / 60} hour limit` : `${minutes} minute limit`;
-
-/**
- * Is the rule in force at any moment of this day? Checks midnight and each window start that day, which
- * covers every change of state, and reads the engine, so it agrees with the map (including week of month).
- */
-function inForce(schedule: Schedule, day: Weekday, timeZone: string): boolean {
-  if (schedule === null) return true;
-  const midnight = instantFor(day, 0, timeZone).getTime();
-  const starts = new Set([0, ...schedule.windows.filter((w) => w.days.includes(day)).map((w) => minutesOf(w.start))]);
-  return [...starts].some((m) => isActive(schedule, new Date(midnight + m * 60_000), timeZone));
-}
 
 /** The exact hours the windows give on this day, including the tail of a window that crossed midnight into it. */
 function hoursText(schedule: Schedule, day: Weekday): string {
@@ -49,13 +38,27 @@ function hoursText(schedule: Schedule, day: Weekday): string {
   return parts.join(', ');
 }
 
-/** Each timed parking row in force on the day, sorted by street, side, then start of the hours. */
-export function zonesForDay(timed: SideCollection, segments: SegmentCollection, day: Weekday, timeZone: string): DayZone[] {
+/** What the list follows: the shared day, hour, time mode (absent means hour) and zone filter (absent means all). */
+export interface ActiveZonesSelection {
+  day: Weekday;
+  hour: number;
+  mode?: TimeMode;
+  zone?: string;
+}
+
+/**
+ * Each timed parking row in force under the selection, sorted by street, side, then start of the hours. Hour: in
+ * force at the hour. Day: in force at any time that day. All times: every row, with its full schedule. The zone
+ * filter keeps only rows whose side lies in that permit zone (or in none).
+ */
+export function activeZones(timed: SideCollection, segments: SegmentCollection, at: ActiveZonesSelection, timeZone: string): DayZone[] {
+  const { day } = at;
+  const mode = at.mode ?? 'hour';
   const streets = new Map(segments.features.map((f) => [f.properties.segment_id, f.properties.street]));
   const zones: DayZone[] = [];
-  for (const f of timed.features) {
+  for (const f of filterByZone(timed, at.zone).features) {
     const schedule = (f.properties.schedule ?? null) as Schedule;
-    if (!inForce(schedule, day, timeZone)) continue;
+    if (!isScheduleActive(schedule, { day, hour: at.hour, mode }, timeZone)) continue;
     const line = f.geometry.coordinates;
     const [a, b] = [line[Math.floor((line.length - 1) / 2)], line[Math.ceil((line.length - 1) / 2)]];
     const code = f.properties.permit_code;
@@ -64,7 +67,7 @@ export function zonesForDay(timed: SideCollection, segments: SegmentCollection, 
       street: String(streets.get(f.properties.segment_id) ?? ''),
       side: f.properties.side,
       limit: limitText(f.properties.limit_minutes),
-      hours: hoursText(schedule, day),
+      hours: mode === 'all' ? scheduleText(schedule) : hoursText(schedule, day),
       permit: typeof code === 'string' && code !== '' ? `Zone ${code} permit exempt` : null,
       center: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
     });
@@ -72,4 +75,12 @@ export function zonesForDay(timed: SideCollection, segments: SegmentCollection, 
   return zones.sort(
     (x, y) => x.street.localeCompare(y.street) || x.side.localeCompare(y.side) || x.hours.localeCompare(y.hours),
   );
+}
+
+/** The panel heading: names the hour, day or all times, then the zone filter, then how many rows. */
+export function activeZonesHeading(at: ActiveZonesSelection, count: number): string {
+  const when =
+    at.mode === 'all' ? 'all times' : at.mode === 'day' ? `${dayName(at.day)}, any time that day` : `${dayName(at.day)} ${clockText(at.hour, 0)}`;
+  const zone = at.zone === undefined || at.zone === 'all' ? '' : at.zone === 'none' ? ', outside permit zones' : `, Zone ${at.zone}`;
+  return `Active zones: ${when}${zone} (${count})`;
 }

@@ -1,6 +1,6 @@
 // The single entry point for city data (task M3-1, architecture rule 3). This is the only code
 // in the app that fetches anything. Phase 2 replaces the body with an API call.
-import type { FeatureCollection, LineString, Polygon } from 'geojson';
+import type { FeatureCollection, LineString, MultiPolygon, Polygon } from 'geojson';
 import { currentRoute, dataBaseUrl } from './route';
 
 export type Side = 'L' | 'R';
@@ -72,6 +72,19 @@ export interface BlockNumbers {
   blocks: Record<string, number | null>;
 }
 
+/** Written by build:data to public/data/<folder>/permit-zone-bounds.json (task M5-9): per permit code, its bounds and outside-the-zone mask. */
+export interface PermitZoneBounds {
+  city_id: string;
+  zones: Record<
+    string,
+    {
+      /** [west, south, east, north]. */
+      bounds: [number, number, number, number];
+      mask: Polygon | MultiPolygon;
+    }
+  >;
+}
+
 export interface CityData {
   cityId: string;
   city: CityConfig;
@@ -88,6 +101,8 @@ export interface CityData {
   /** Absent when the city has no polygons or config of this kind yet. */
   zoning: PolygonCollection | null;
   permitZones: PolygonCollection | null;
+  /** Absent when the folder was built before task M5-9; the page then cannot isolate a zone. */
+  permitZoneBounds: PermitZoneBounds | null;
   curbColorConfig: CurbColorsConfig | null;
   zoningCategories: ZoningCategoriesConfig | null;
 }
@@ -121,7 +136,7 @@ export async function loadCity(folder: string, options: LoadOptions = {}): Promi
   const required = <T>(file: string) => getJson<T>(fetcher, url(file), false) as Promise<T>;
   const optional = <T>(file: string) => getJson<T>(fetcher, url(file), true);
 
-  const [city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, metadata, zoning, permitZones, curbColorConfig, zoningCategories, blocks] =
+  const [city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, metadata, zoning, permitZones, curbColorConfig, zoningCategories, blocks, permitZoneBounds] =
     await Promise.all([
       required<CityConfig>('city.json'),
       required<SegmentCollection>('segments.geojson'),
@@ -137,7 +152,11 @@ export async function loadCity(folder: string, options: LoadOptions = {}): Promi
       optional<CurbColorsConfig>('curb-colors.json'),
       optional<ZoningCategoriesConfig>('zoning-categories.json'),
       optional<BlockNumbers>('blocks.json'),
+      optional<PermitZoneBounds>('permit-zone-bounds.json'),
     ]);
 
-  return { cityId: folder, city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, metadata, zoning, permitZones, curbColorConfig, zoningCategories, blocks };
+  return {
+    cityId: folder, city, segments, sweeping, timedParking, restrictions, curbColors, coverage, trim, metadata,
+    zoning, permitZones, permitZoneBounds, curbColorConfig, zoningCategories, blocks,
+  };
 }

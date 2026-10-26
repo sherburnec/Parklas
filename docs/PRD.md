@@ -71,7 +71,7 @@ Every layer responds to one shared day and time, and every active rule is drawn 
 | --- | --- | --- |
 | Zoning | Zoned areas of the city | Fill color by category (residential, commercial, mixed and so on). Burbank has about 25 to 30 zoning types, so each record keeps its exact zone code and maps to a category. Not time-based. |
 | Street sweeping | Which curb sides are being swept | Active sides highlighted at the chosen time, inactive sides muted, left and right side drawn separately |
-| Timed parking | Zones with a time limit | A distinct style per limit (1, 2, 3, 4 hours and so on), with a fallback style for any other limit. Each zone has its own days and hours, and some have none. A row with a permit code is labelled "Zone X permit exempt". A "zones for the day" view lists the zones that apply, when each is active and any permit exemption. |
+| Timed parking | Zones with a time limit | A distinct style per limit (1, 2, 3, 4 hours and so on), with a fallback style for any other limit. Each zone has its own days and hours, and some have none. A row with a permit code is labelled "Zone X permit exempt". A "active zones" view lists the zones that apply, when each is active and any permit exemption. |
 | Restrictions | No-parking rows only: no parking except by permit, no parking at specific times, and no parking at any time | Three distinct styles, set by the row's permit code and schedule. An "except by permit" row is labelled "Zone X permit required"; any other row with a permit code is labelled "Zone X permit exempt" |
 | No stopping, standing or parking | The strictest restrictions: no-stopping and no-standing rows | Drawn from the restrictions file filtered by type, with its own toggle and the highest-contrast highlight on the map. No stopping and no standing differ in one visual detail (for example solid versus dashed) and are named in the click list. Rows follow the time slider like any other rule |
 | Curb colors | Painted curbs | Color and timing come from a config file. A new color is added by editing the config. Each color has its own schedule or none. |
@@ -182,7 +182,7 @@ The implementation plan traces each task to these IDs. Source: `docs/PLAN.md`.
 | FR-2 | Day picker, hourly slider, Now in Burbank time, play |
 | FR-3 | Zoning polygons colored by category from exact zone code |
 | FR-4 | Street sweeping by side, active highlighted, inactive muted |
-| FR-5 | Timed parking, style per limit, "Zone X permit exempt" label, "zones for the day" list with exemptions |
+| FR-5 | Timed parking, style per limit, "Zone X permit exempt" label, "active zones" list with exemptions |
 | FR-6 | Restrictions (no-parking rows): three styles, "Zone X permit required" or "Zone X permit exempt" shown |
 | FR-7 | No-stopping and no-standing rows in the highest-contrast style, distinguishable from each other, own toggle |
 | FR-8 | Curb colors and schedules from a config file |

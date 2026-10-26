@@ -10,6 +10,7 @@ export type {
   Coverage,
   CurbColorsConfig,
   LoadOptions,
+  PermitZoneBounds,
   PolygonCollection,
   Schedule,
   ScheduleWindow,

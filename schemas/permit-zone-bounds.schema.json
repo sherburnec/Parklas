@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://parklas.local/schemas/permit-zone-bounds.schema.json",
+  "title": "Permit zone bounds and masks",
+  "description": "public/data/<city_id>/permit-zone-bounds.json. Written by build:data from permit-zones.geojson; never edited by hand. One entry per permit code: the bounding box the page fits the map to, and the outside-the-zone mask it draws to dim everything else.",
+  "type": "object",
+  "required": ["city_id", "zones"],
+  "additionalProperties": false,
+  "properties": {
+    "city_id": { "type": "string", "pattern": "^[a-z0-9_-]+$" },
+    "zones": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/zone" }
+    }
+  },
+  "definitions": {
+    "position": { "type": "array", "items": { "type": "number" }, "minItems": 2 },
+    "ring": { "type": "array", "items": { "$ref": "#/definitions/position" }, "minItems": 4 },
+    "zone": {
+      "type": "object",
+      "required": ["bounds", "mask"],
+      "additionalProperties": false,
+      "properties": {
+        "bounds": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "[west, south, east, north]."
+        },
+        "mask": {
+          "description": "The world rectangle with the zone cut out. A zone's own holes are extra polygons.",
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["type", "coordinates"],
+              "additionalProperties": false,
+              "properties": {
+                "type": { "const": "Polygon" },
+                "coordinates": { "type": "array", "items": { "$ref": "#/definitions/ring" }, "minItems": 1 }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["type", "coordinates"],
+              "additionalProperties": false,
+              "properties": {
+                "type": { "const": "MultiPolygon" },
+                "coordinates": {
+                  "type": "array",
+                  "items": { "type": "array", "items": { "$ref": "#/definitions/ring" }, "minItems": 1 },
+                  "minItems": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

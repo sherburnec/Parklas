@@ -21,7 +21,7 @@ Phase 1 is a public GitHub Pages site that maps hand-made Burbank curb rules ont
 
 ## Scope
 
-**In scope:** OSM street base with names and a "not yet mapped" state; six rule layers (zoning, sweeping, timed parking, restrictions, no stopping/standing, curb colors); permit zones and overview; zone filter; day picker, hourly slider, Now in Burbank time, play; per-layer toggles, side bands and a click-through list; "zones for the day"; authoring templates, validator and build script; last-updated date and reference-tool label; automatic deploy.
+**In scope:** OSM street base with names and a "not yet mapped" state; six rule layers (zoning, sweeping, timed parking, restrictions, no stopping/standing, curb colors); permit zones and overview; zone filter; day picker, hourly slider, Now in Burbank time, play; per-layer toggles, side bands and a click-through list; "active zones"; authoring templates, validator and build script; last-updated date and reference-tool label; automatic deploy.
 
 **Out of scope:** patrol beats, live GPS, real map tiles, logins, database and API, offline use, tickets, legal authority for citations, holidays, an in-app data editor.
 
@@ -34,7 +34,7 @@ A static site reads prebuilt GeoJSON. All heavy work happens in build scripts, n
 1. A one-time script extracts Burbank streets from OSM and splits them into blocks with a stable `segment_id`. The result is frozen as `data/burbank/segments.geojson`. A deliberate re-extraction reports changed IDs and reversed directions.
 2. Rules are authored as CSV rows: `segment_id, side, layer, type, limit_minutes, permit_code, permit_mode, color_key, schedule`. `side` is L or R, relative to the segment's direction.
 3. The validator checks every file against JSON Schema and reports file, row and reason.
-4. `build:data` writes one GeoJSON file per layer, a coverage file, `trim.json` (band geometry flags), `blocks.json` (block numbers), `metadata.json` (last updated), and a `permit_zone` on every side's features.
+4. `build:data` writes one GeoJSON file per layer, a coverage file, `trim.json` (band geometry flags), `blocks.json` (block numbers), `metadata.json` (last updated), `permit-zone-bounds.json` (each permit zone's bounds and outside-the-zone mask, M5-9), and a `permit_zone` on every side's features.
 5. The page at `/<folder>/` loads `data/<folder>/` through the data loader and draws it (M5-7).
 
 **Modules** (AR-2)
@@ -46,7 +46,7 @@ A static site reads prebuilt GeoJSON. All heavy work happens in build scripts, n
 | `schedule-engine` | Pure functions: is a rule active, when it next changes | None |
 | `layers` | Styles and draws each rule layer and side bands | None |
 | `time-ui` | Day picker, slider, Now, play, time mode, toggles, zone filter | None |
-| `curb-detail` | Click-through list and "zones for the day" | None |
+| `curb-detail` | Click-through list and "active zones" | None |
 
 **Schedule format**
 
@@ -98,7 +98,7 @@ Sizes: S = up to 1 day, M = 2 to 4 days, L = 1 to 2 weeks, part-time. Estimates 
 | M4-1 ✅ | Shared state (day, hour, toggles) in memory and the URL | FR-1 |
 | M4-2 ✅ | Day picker, hourly slider, Now in Burbank time across DST, play | FR-2 |
 | M4-3 ✅ | Click-through list: every rule per side, active state, next change, permit zone | FR-9 |
-| M4-4 ✅ | "Zones for the day" list for timed parking | FR-5 |
+| M4-4 ✅ | "Active zones" list for timed parking | FR-5 |
 | M4-5 ✅ | Zone filter (All, each zone, No zone) on every rule layer, kept in the URL | FR-10 |
 | M5-1 ✅ | Responsive layout and 44 px touch targets; bottom panel at 700 px and narrower | FR-14 |
 | M5-2 ✅ | Last-updated date and reference-tool label | FR-13 |
@@ -125,7 +125,7 @@ Sizes: S = up to 1 day, M = 2 to 4 days, L = 1 to 2 weeks, part-time. Estimates 
 | M2-7.2 ✅ | Revision of M2-7: the authoring page shows the longitude and latitude of the last point clicked on the map, in a fixed box at the bottom right. The box is empty until the first click and updates on every click, on a block or off it. Authoring page only; the public page is unchanged. Click-to-copy of the segment ID is unchanged. State stays in memory | M2-7 | S | After a click the box shows that point's coordinates to 6 decimals; a later click replaces them; the public page has no such box; `npm test` and `npm run build` pass | DM-3 |
 | M5-7 ✅ | City routes. Each data folder gets its own pages: `/burbank/` loads `data/burbank/`, `/burbank-sample/` loads `data/burbank-sample/`, and the authoring page is `/<folder>/authoring.html` (lowercase, since Pages paths are case-sensitive). Recommended approach: the build emits a real `index.html` and `authoring.html` in a folder per data folder (Vite multi-page entries generated from the `data/` folders), so every route is a real file on GitHub Pages, with no 404-redirect trick, and returns 200. The page reads its folder from its own path; the data loader resolves `data/` from the site root, not the page's folder. The sample banner shows when the folder is a sample set, replacing the page-level `DATA_SET` (the scripts keep it). The site root is a page listing the folders to choose from, with the default folder named in `config/` marked (`burbank-sample` until TD-10), and `/authoring.html` redirects to that folder's authoring page. An unknown path gets a 404 page listing the folders that exist. The query state (day, hour, toggles, zone) works the same on every route | M3-1, TD-1 | M | One build serves `/burbank/` and `/burbank-sample/`, each with its own data and the banner only on the sample one; `/burbank/authoring.html` and `/burbank-sample/authoring.html` load their own data; the root lists every folder and links to each; `/authoring.html` redirects to the default folder's authoring page; an unknown path shows the 404 list; a new data folder gets its routes with no code change; the basemap isolation and storage tests still pass; `npm test` and `npm run build` pass | AR-3, DM-2 |
 | M5-8 ✅ | Time mode with three settings, kept in memory and the URL (`mode=day` or `mode=all`; absent means hour). **Hour** is today's behavior. **Day**: a rule counts as active if any window is in force at any minute of the chosen day, including a window that began the night before; the slider and play are disabled, the day picker works. **All times**: every rule is drawn as active whatever its schedule; the day picker, slider and play are disabled. Now switches back to Hour. A new pure schedule-engine function answers "active at any time on this day", handling midnight crossing, null and week-of-month the same way Hour does. Every rule layer and the zone filter follow the mode. The curb detail list says which mode is on: Hour is unchanged, Day lists each rule's windows that day or "Not active today", All times lists each rule's full schedule | M2-1, M4-1, M4-2, M4-3 | M | Engine tests cover a window crossing into and out of the day, null, week-of-month and a rule on another day only; a Mon 18:00–06:00 rule is active on Mon and Tue in Day mode and inactive on Wed; switching modes redraws every layer with no reload; Now returns to Hour; the mode survives a reload from the URL; `npm test` and `npm run build` pass | FR-1, FR-2, FR-9, DM-1 |
-| M5-9 | Isolate a permit zone, building on the M4-5 filter. Choosing a zone (A to H; `DEMO-` codes in the sample set) in the filter, or by clicking its polygon or legend entry, isolates it: only that zone's polygon shows, the map fits to it, the area outside is dimmed, and every rule layer stays limited to that zone as now. All shows every zone again without moving the map; No zone is unchanged. The build writes each zone's bounds and an outside-the-zone mask, so the page does no geometry. The existing `zone` URL value carries it, so a link with `zone=C` opens isolated and fitted to Zone C | M3-9, M4-5 | M | Picking C shows only Zone C's polygon, fits the map to it and dims the rest; clicking another zone's polygon or legend entry isolates that zone; a link with `zone=C` opens isolated; All restores every zone; works on both `burbank` and `burbank-sample`; `npm test` and `npm run build` pass | FR-10 |
+| M5-9 ✅ | Isolate a permit zone, building on the M4-5 filter. Choosing a zone (A to H; `DEMO-` codes in the sample set) in the filter, or by clicking its polygon or legend entry, isolates it: only that zone's polygon shows, the map fits to it, the area outside is dimmed, and every rule layer stays limited to that zone as now. All shows every zone again without moving the map; No zone is unchanged. The build writes each zone's bounds and an outside-the-zone mask, so the page does no geometry. The existing `zone` URL value carries it, so a link with `zone=C` opens isolated and fitted to Zone C | M3-9, M4-5 | M | Picking C shows only Zone C's polygon, fits the map to it and dims the rest; clicking another zone's polygon or legend entry isolates that zone; a link with `zone=C` opens isolated; All restores every zone; works on both `burbank` and `burbank-sample`; `npm test` and `npm run build` pass | FR-10 |
 | TD-10 | Switch the public site to real data: `data/burbank/` holds empty rule files from the templates, and the default folder in `config/` (M5-7) becomes `burbank`, so the site root opens `/burbank/`. `/burbank-sample/` stays for tests and is never the default | M2-5, M5-7 | S | A build with `DATA_SET=real` passes; the site root opens `/burbank/` with no sample banner; `public/data/burbank/` has no `SAMPLE-` or `DEMO-` codes; every block not yet entered shows as not yet mapped | Testing |
 | M6-1 | Pilot data: one dense area, all layers | TD-10 | M | Area passes the validator and every layer has rows | Phasing |
 | M6-2 | Accuracy walk: check 20 pilot curb sides against signs | M6-1 | M | 20 of 20 match or are corrected | Risk 1 |
@@ -157,7 +157,7 @@ The Phase 1 exit criteria are in the PRD handoff section.
 ## Open items
 
 - **Pilot area** is not chosen yet. It blocks M6-1.
-- **Browser check:** M3-7 to M3-9, M4-1 to M4-5, M5-1, M5-2 and M5-5 were built without a browser. Check them by eye before M6-1.
+- **Browser check:** M3-7 to M3-9, M4-1 to M4-5, M5-1, M5-2, M5-5 and M5-9 were built without a browser. Check them by eye before M6-1.
 - **Block numbers:** 2,404 of 2,582 blocks need hand entry; `data/burbank/blocks-report.md` is the to-do list.
 - **City-grid labels** use a rough hand-measured angle that fits downtown and is off elsewhere.
 - Other open questions, such as zoning category grouping and permit codes on no-stopping rows, are tracked in the PRD.

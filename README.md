@@ -34,9 +34,9 @@ The site has one map page and one authoring page for each data folder under `dat
 | **Now** | In the time box | Jumps to the current day and hour in Burbank time, whatever time zone your device is in. |
 | **Play / Pause** | In the time box | Moves through the day hour by hour, so you can watch rules switch on and off. |
 | **Layer toggles** | Top left | Turn each layer on or off: Zoning, Permit zones, Street sweeping, Timed parking, Restrictions, No stopping / standing, Curb colors. |
-| **Permit zone filter** | Left | Pick All, one permit zone, or No zone. Every rule layer then shows only curb sides in that zone, and the zone is outlined on the map. |
+| **Permit zone filter** | Left | Pick All, one permit zone, or No zone. Picking a zone (or clicking its polygon or its entry in the permit zone legend) isolates it: only that zone's polygon shows, the map fits to it, the area outside is dimmed, and every rule layer shows only curb sides in that zone. All shows every zone again without moving the map. Clicking a curb still opens its detail and does not change the zone. |
 | **Curb detail** | Right (click any block) | Lists every rule on both sides of the block, including ones that are off right now. Each rule shows whether it is active, when it next changes, any permit wording ("Zone A permit required" or "Zone A permit exempt") and which permit zone the side is in. The heading shows the block number when it is known, for example "1200 block of West Olive Avenue". |
-| **Zones for the day** | Bottom centre | Lists every timed parking zone in force on the chosen day, with its limit, hours and permit exemption. Click one to fly to it and open its curb detail. |
+| **Active zones** | Bottom centre | Lists every timed parking zone in force on the chosen day, with its limit, hours and permit exemption. Click one to fly to it and open its curb detail. |
 | **Legends** | Bottom right | The colors and line styles for each layer. |
 | **Footer** | Bottom | The reference-tool notice and the date the data was last updated. |
 
@@ -307,7 +307,7 @@ src/
   schedule-engine/      Works out whether a rule is on and when it next changes
   layers/               Draws each rule layer
   time-ui/              Day, hour, Now, Play, toggles, zone filter, URL state
-  curb-detail/          Curb detail list and "Zones for the day"
+  curb-detail/          Curb detail list and "Active zones"
   authoring/            The authoring map page
 index.html              The public map
 authoring.html          The authoring map
