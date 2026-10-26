@@ -232,10 +232,13 @@ export function anyPermitCodeAt(segment: Segment, permitZones: PermitZoneCollect
 const SPREAD_LIMITS = [60, 120, 180, 240, 60, 120, 180, 240, 30];
 const ADD_MAPPED_COMMERCIAL = 0.6; // chance a segment already mapped in a commercial or mixed-use zone gets a timed row
 const ADD_MAPPED_ELSEWHERE = 0.06;
-const ADD_NEW_COMMERCIAL = 0.04; // chance an unmapped one is mapped, with timed parking only
+const ADD_NEW_COMMERCIAL = 0.03; // chance an unmapped one is mapped, with timed parking only
 const ADD_NEW_ELSEWHERE = 0.003;
-const ADD_IN_PERMIT_ZONE = 0.5; // for mapped segments inside a permit zone
-const PERMIT_ON_ROW = 0.55;
+// The permit zones tile the whole city (TD-8.2), but the chances below were tuned when zones held about this share of it.
+// Every chance tied to a permit zone is scaled by it, so permit codes stay as rare as they were.
+const ZONE_SHARE = 0.12;
+const ADD_IN_PERMIT_ZONE = 0.5 * ZONE_SHARE; // for mapped segments inside a permit zone
+const PERMIT_ON_ROW = 0.55 * ZONE_SHARE;
 const ON_SWEPT_SIDE = 0.5;
 
 function spreadSchedule(rng: Rng): Schedule {
@@ -299,7 +302,7 @@ function spreadTimedParking(rows: RuleRow[], segments: SegmentCollection, ctx: S
 // and no stopping rows; this adds what was missing: no parking at any time, permit-only rows that use the code of the
 // DEMO- zone they sit in, no stopping on corner blocks, and restrictions on sides that already have timed parking.
 const CORNER_MAX_M = 90; // a "corner" block is short and ends at a different street
-const ADD_PERMIT_ONLY = [0.25, 0.03]; // [mapped, unmapped] chance for segments inside a permit zone
+const ADD_PERMIT_ONLY = [0.25 * ZONE_SHARE, 0.03 * ZONE_SHARE]; // [mapped, unmapped] chance for segments inside a permit zone
 const ADD_NO_STOPPING = [0.15, 0.012]; // corner blocks
 const ADD_ANY_TIME = [0.05, 0.006];
 const ADD_NO_STANDING = [0.04, 0.004];
@@ -397,7 +400,7 @@ function alignPermitCodes(rows: RuleRow[], segments: SegmentCollection, ctx: Sam
   });
 }
 
-const ADD_EXEMPT = [0.3, 0.03]; // [mapped, unmapped] chance for segments inside a permit zone
+const ADD_EXEMPT = [0.3 * ZONE_SHARE, 0.03 * ZONE_SHARE]; // [mapped, unmapped] chance for segments inside a permit zone
 
 /**
  * Exemption codes (task TD-6): a few scheduled no-parking rows inside a DEMO- zone carry that zone's code, meaning its

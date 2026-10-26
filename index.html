@@ -72,7 +72,9 @@
         background: rgba(255, 255, 255, 0.95); border-radius: 4px;
       }
       #day-zones summary { cursor: pointer; font-weight: 600; }
-      #day-zones ul { margin: 6px 0 0; padding: 0; list-style: none; max-height: 40vh; overflow-y: auto; }
+      #day-zones > div { margin: 6px 0 0; max-height: 40vh; overflow-y: auto; }
+      #day-zones h3 { margin: 6px 0 2px; font-size: 12px; }
+      #day-zones ul { margin: 0; padding: 0; list-style: none; }
       #day-zones button {
         display: block; width: 100%; padding: 4px 6px; text-align: left; font: inherit; cursor: pointer;
         background: none; border: 0; border-bottom: 1px solid #ddd;
@@ -137,7 +139,7 @@
           background: #f6f6f6; box-shadow: none;
         }
         #curb-detail { padding: 8px 10px; background: #fff; border-bottom: 1px solid #ddd; overflow-y: visible; }
-        #day-zones ul { max-height: 30vh; }
+        #day-zones > div { max-height: 30vh; }
         #legends { align-items: stretch; max-height: none; overflow: visible; padding: 0; background: none; }
         #time-controls .time-readout { font-size: 16px; }
         #time-controls .day-picker button { padding: 0; }

@@ -116,7 +116,7 @@ loadCity(FOLDER)
       detail.show(segmentId);
     });
 
-    // Timed parking in force on the chosen day; picking one centres the map and opens its block (M4-4).
+    // The rules in force for every layer toggled on; picking one centres the map and opens its block (M4-4, M5-9.2).
     createDayZones(controls, city, {
       timeZone: zone,
       state,

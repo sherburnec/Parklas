@@ -11,18 +11,18 @@ Each case below is one street side whose rules are the last rows of `rules.csv`.
 
 | Case | segment_id | Street | Cross streets | Side | What it tests |
 | --- | --- | --- | --- | --- | --- |
-| A | `burbank-122864774-122949983` | North Lamer Street | Whitney Lane and Wedgewood Lane | L | Stack with a midnight crossing, a null schedule and an 08:30 start |
-| B | `burbank-122647361-122907126` | West Chandler Boulevard North | North Naomi Street and North Florence Street | L | Stack with a Sunday-into-Monday window |
-| C | `burbank-123467938-123473379` | Moss Street | West Linden Avenue and Linden Court | L | Stack with a weeks_of_month [1, 3] row |
-| D | `burbank-6606789893-6606789900` | Empire Avenue | Clybourn Avenue and (none) | L | Inner-facing side with one rule |
-| E | `burbank-725245616-9996406093` | Edison Boulevard | Maple Street and West Allen Avenue | L | Sliver with one rule |
+| A | `burbank-122647357-122907123` | West Chandler Boulevard South | North Naomi Street and Florence Street | L | Stack with a midnight crossing, a null schedule and an 08:30 start |
+| B | `burbank-123482396-123605880` | North Parish Place | Bonita Avenue and Rosita Avenue | L | Stack with a Sunday-into-Monday window |
+| C | `burbank-123442566-123442570` | Lake Street | West Linden Avenue and West Linden Avenue | L | Stack with a weeks_of_month [1, 3] row |
+| D | `burbank-1897595379-6606789899` | Empire Avenue | (none) and Clybourn Avenue | R | Inner-facing side with one rule |
+| E | `burbank-13505960224-13505960225` | South Hollywood Way | North Hollywood Way / Olive Avenue and Hollywood Way / Olive Avenue | R | Sliver with one rule |
 
 ## Case A: Stack with a midnight crossing, a null schedule and an 08:30 start
 
-- segment_id: `burbank-122864774-122949983`
-- Street: North Lamer Street, between Whitney Lane and Wedgewood Lane
+- segment_id: `burbank-122647357-122907123`
+- Street: West Chandler Boulevard South, between North Naomi Street and Florence Street
 - Side: **L**
-- Permit zone: none
+- Permit zone: DEMO-F
 - Drawing: drawn, one band per layer
 - Sweeping starts at 08:30. The slider steps by the hour, so at Tue 08:00 it shows not active and at Tue 09:00 active; the detail list always shows 08:30 to 10:30.
 - The no parking window runs Fri 22:00 to Sat 06:00 and Sat 22:00 to Sun 06:00. At Sat 02:00 it is active through Friday night's window.
@@ -65,10 +65,10 @@ Each case below is one street side whose rules are the last rows of `rules.csv`.
 
 ## Case B: Stack with a Sunday-into-Monday window
 
-- segment_id: `burbank-122647361-122907126`
-- Street: West Chandler Boulevard North, between North Naomi Street and North Florence Street
+- segment_id: `burbank-123482396-123605880`
+- Street: North Parish Place, between Bonita Avenue and Rosita Avenue
 - Side: **L**
-- Permit zone: none
+- Permit zone: DEMO-B
 - Drawing: drawn, one band per layer
 - No standing runs from Sun 20:00 to Mon 04:00. It is active at Mon 02:00 although Monday is not in its days.
 - The red curb row has its own schedule, which replaces red's default (none).
@@ -109,10 +109,10 @@ Each case below is one street side whose rules are the last rows of `rules.csv`.
 
 ## Case C: Stack with a weeks_of_month [1, 3] row
 
-- segment_id: `burbank-123467938-123473379`
-- Street: Moss Street, between West Linden Avenue and Linden Court
+- segment_id: `burbank-123442566-123442570`
+- Street: Lake Street, between West Linden Avenue and West Linden Avenue
 - Side: **L**
-- Permit zone: none
+- Permit zone: DEMO-H
 - Drawing: drawn, one band per layer
 - Weeks of month is a format test only; Burbank does not use it. The app's reference week is Sun 4 Jan to Sat 10 Jan 2026, so Mon 5 Jan is week 1 and the sweeping row is active at Mon 10:00. Mon 12 Jan (week 2) is skipped, so from Thu 8 Jan the next change is Mon 19 Jan, 11 days later.
 - The 30 minute timed parking row tests the fallback style.
@@ -154,10 +154,10 @@ Each case below is one street side whose rules are the last rows of `rules.csv`.
 
 ## Case D: Inner-facing side with one rule
 
-- segment_id: `burbank-6606789893-6606789900`
-- Street: Empire Avenue, between Clybourn Avenue and (none)
-- Side: **L**
-- Permit zone: none
+- segment_id: `burbank-1897595379-6606789899`
+- Street: Empire Avenue, between (none) and Clybourn Avenue
+- Side: **R**
+- Permit zone: DEMO-A
 - Drawing: not drawn at any hour (inner-facing side); its rule still appears in the detail list
 - trim.json flags this side as inner-facing, so the map never draws it at any hour. The curb detail list must still list the rule, with its state and next change.
 - The other side of this block, and any rule on it, is not part of this case.
@@ -186,10 +186,10 @@ Each case below is one street side whose rules are the last rows of `rules.csv`.
 
 ## Case E: Sliver with one rule
 
-- segment_id: `burbank-725245616-9996406093`
-- Street: Edison Boulevard, between Maple Street and West Allen Avenue
-- Side: **L**
-- Permit zone: none
+- segment_id: `burbank-13505960224-13505960225`
+- Street: South Hollywood Way, between North Hollywood Way / Olive Avenue and Hollywood Way / Olive Avenue
+- Side: **R**
+- Permit zone: DEMO-F
 - Drawing: a sliver (under 20 m), drawn because it has a rule in this layer
 - This block is under 20 m (a sliver in trim.json). Slivers are drawn only if they have a rule in the layer, and this is the only row in its layer on the block, so its band must be drawn.
 - The other side of this block, and any rule on it, is not part of this case.

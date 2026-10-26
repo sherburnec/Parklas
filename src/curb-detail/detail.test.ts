@@ -122,17 +122,17 @@ describe('block heading (task M5-5)', () => {
 });
 
 describe('describeSegment', () => {
-  const id = 'burbank-122931465-122931467';
+  const id = 'burbank-118435764-6856678722';
 
   it('lists both sides of a segment with street and cross streets', () => {
     const view = describeSegment(data, id, { day: 'tue', hour: 9 }, ZONE);
     expect(view.mapped).toBe(true);
-    expect(view.street).toBe('Groton Drive');
-    expect(view.fromStreet).toBe('North 6th Street');
-    expect(view.toStreet).toBe('Jolley Drive');
+    expect(view.street).toBe('West Verdugo Avenue');
+    expect(view.fromStreet).toBe('North Reese Place');
+    expect(view.toStreet).toBe('North Orchard Drive');
     expect(view.sides.map((s) => s.side)).toEqual(['L', 'R']);
     expect(view.sides[0].rules).toHaveLength(3);
-    expect(view.sides[0].permitZone).toBe('DEMO-B');
+    expect(view.sides[0].permitZone).toBe('DEMO-G');
   });
 
   it('leaves the permit zone unknown for a side with no rule rows', () => {

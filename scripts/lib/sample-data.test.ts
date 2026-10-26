@@ -355,7 +355,7 @@ describe('permit codes against the permit zones (TD-8)', () => {
   const data = resolve(import.meta.dirname, '..', '..', 'data');
   const real = JSON.parse(readFileSync(resolve(data, 'burbank', 'segments.geojson'), 'utf8')) as SegmentCollection;
   const zoning = generateZoning(real, 'burbank-sample');
-  const permitZones = generatePermitZones(real, zoning, 'burbank-sample');
+  const permitZones = generatePermitZones(real, 'burbank-sample');
   const rows = generateSampleRows(real, SAMPLE_SEED, { zoning, permitZones }, null);
   const byId = new Map(real.features.map((f) => [f.properties.segment_id, f]));
   const coded = rows.filter((r) => r.permit_code !== null);

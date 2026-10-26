@@ -24,7 +24,7 @@ export { drawPermitZones } from './draw-permit-zones';
 export type { PermitZonesLayer, PermitZonesOptions } from './draw-permit-zones';
 export { isolationFor, maskCollection, zoneShownFilter } from './permit-zone-isolation';
 export type { ZoneIsolation } from './permit-zone-isolation';
-export { PERMIT_ZONE_HEXES, permitZoneLegend, permitZoneStyle } from './permit-zones';
+export { PERMIT_ZONE_FILL_OPACITY, PERMIT_ZONE_HEXES, permitZoneLegend, permitZoneStyle, zoneFillOpacity } from './permit-zones';
 export type { PermitZoneLegendEntry } from './permit-zones';
 export { bandOffsetPx, bandWidthPx, layoutBands } from './bands';
 export type { BandLayout, HiddenBand } from './bands';

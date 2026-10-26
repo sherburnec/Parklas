@@ -2,11 +2,11 @@ import type { GeoJSONSource, Map as MapLibreMap, PointLike } from 'maplibre-gl';
 import type { PermitZoneBounds, PolygonCollection } from '../data-loader';
 import { isolationFor, maskCollection, zoneShownFilter } from './permit-zone-isolation';
 import type { ZoneIsolation } from './permit-zone-isolation';
-import { permitZoneLegend, permitZoneStyle } from './permit-zones';
+import { permitZoneLegend, permitZoneStyle, zoneFillOpacity } from './permit-zones';
 
 const SOURCE_ID = 'permit-zones';
 const LAYER_IDS = ['permit-zones-fill', 'permit-zones-outline', 'permit-zones-label'];
-const SELECTED_IDS = ['permit-zones-selected-fill', 'permit-zones-selected-outline'];
+const SELECTED_ID = 'permit-zones-selected-outline';
 const MASK_SOURCE_ID = 'permit-zones-mask';
 const MASK_LAYER_ID = 'permit-zones-mask-fill';
 const FIT_PADDING_PX = 40;
@@ -53,7 +53,7 @@ export function drawPermitZones(
       id: LAYER_IDS[0],
       type: 'fill',
       source: SOURCE_ID,
-      paint: { 'fill-color': ['get', 'hex'], 'fill-opacity': 0.25 },
+      paint: { 'fill-color': ['get', 'hex'], 'fill-opacity': zoneFillOpacity(null) },
     },
     beforeLayerId,
   );
@@ -76,29 +76,20 @@ export function drawPermitZones(
         'text-field': ['get', 'label'],
         'text-font': ['Noto Sans Regular'],
         'text-size': ['interpolate', ['linear'], ['zoom'], 11, 12, 17, 18],
-        'text-allow-overlap': true,
+        'text-allow-overlap': false, // a polygon is split across map tiles, and each piece would draw its own copy of the label
+        'text-padding': 8,
       },
       paint: { 'text-color': ['get', 'hex'], 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
     },
     beforeLayerId,
   );
 
-  // The chosen zone: a stronger fill and a thick outline, added after the others so they draw on top.
-  const selectedIds = SELECTED_IDS;
+  // The chosen zone: a thick outline, added after the others so it draws on top. Its fill is not stacked on the base
+  // fill (that would darken it); the base fill gets the lighter value for that zone instead (see highlight).
   const matches = (code: string | null): ['==', ['get', string], string] => ['==', ['get', 'permit_code'], code ?? ''];
   map.addLayer(
     {
-      id: selectedIds[0],
-      type: 'fill',
-      source: SOURCE_ID,
-      filter: matches(null),
-      paint: { 'fill-color': ['get', 'hex'], 'fill-opacity': 0.4 },
-    },
-    beforeLayerId,
-  );
-  map.addLayer(
-    {
-      id: selectedIds[1],
+      id: SELECTED_ID,
       type: 'line',
       source: SOURCE_ID,
       filter: matches(null),
@@ -140,7 +131,8 @@ export function drawPermitZones(
       legend.hidden = !visible;
     },
     highlight(code) {
-      for (const id of selectedIds) map.setFilter(id, matches(code));
+      map.setFilter(SELECTED_ID, matches(code));
+      map.setPaintProperty(LAYER_IDS[0], 'fill-opacity', zoneFillOpacity(code));
       for (const row of legend.querySelectorAll<HTMLButtonElement>('button[data-code]')) {
         row.setAttribute('aria-pressed', String(row.dataset.code === code));
       }

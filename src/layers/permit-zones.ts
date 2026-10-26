@@ -9,6 +9,21 @@ export const PERMIT_ZONE_HEXES = [
   '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#008080', '#9a6324', '#808000',
 ];
 
+/**
+ * Fill opacity of the zone polygons (M5-9.2): `all` for every zone, `selected` for the highlighted or isolated one.
+ * The chosen zone is lighter, so the curb bands inside it stay readable; its thick outline marks it instead.
+ */
+export const PERMIT_ZONE_FILL_OPACITY = { all: 0.125, selected: 0.05 } as const;
+
+/**
+ * The fill-opacity paint value with `code` highlighted: the lighter value on that zone, the base value on the rest.
+ * With null, a plain number, so every fill is unchanged.
+ */
+export function zoneFillOpacity(code: string | null): number | ['case', ['==', ['get', string], string], number, number] {
+  if (code === null) return PERMIT_ZONE_FILL_OPACITY.all;
+  return ['case', ['==', ['get', 'permit_code'], code], PERMIT_ZONE_FILL_OPACITY.selected, PERMIT_ZONE_FILL_OPACITY.all];
+}
+
 export interface PermitZoneLegendEntry {
   code: string;
   hex: string;

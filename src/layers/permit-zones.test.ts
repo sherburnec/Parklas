@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PolygonCollection } from '../data-loader';
-import { PERMIT_ZONE_HEXES, permitZoneLegend, permitZoneStyle } from './permit-zones';
+import { PERMIT_ZONE_FILL_OPACITY, PERMIT_ZONE_HEXES, permitZoneLegend, permitZoneStyle, zoneFillOpacity } from './permit-zones';
 
 const square = [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]];
 const zone = (permit_code: unknown) => ({
@@ -53,5 +53,22 @@ describe('permitZoneLegend', () => {
 
   it('is empty when there are no zones', () => {
     expect(permitZoneLegend(zones())).toEqual([]);
+  });
+});
+
+describe('zone fill opacity (M5-9.2)', () => {
+  it('keeps the fill values in one constant, with a highlighted zone lighter than the rest', () => {
+    expect(PERMIT_ZONE_FILL_OPACITY.selected).toBeGreaterThan(0);
+    expect(PERMIT_ZONE_FILL_OPACITY.selected).toBeLessThan(PERMIT_ZONE_FILL_OPACITY.all);
+  });
+
+  it('is the plain base value with no zone highlighted', () => {
+    expect(zoneFillOpacity(null)).toBe(PERMIT_ZONE_FILL_OPACITY.all);
+  });
+
+  it('gives only the highlighted zone the lighter value, and the others the base value', () => {
+    expect(zoneFillOpacity('C')).toEqual([
+      'case', ['==', ['get', 'permit_code'], 'C'], PERMIT_ZONE_FILL_OPACITY.selected, PERMIT_ZONE_FILL_OPACITY.all,
+    ]);
   });
 });

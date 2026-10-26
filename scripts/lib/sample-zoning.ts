@@ -54,7 +54,8 @@ function snapCuts(values: number[], targets: number[]): number[] {
   return targets.map((t) => sorted.reduce((best, v) => (Math.abs(v - t) < Math.abs(best - t) ? v : best)));
 }
 
-export function zoningCuts(segments: SegmentCollection, cols: number, rows: number): { xs: number[]; ys: number[] } {
+/** Cut lines are spread evenly over the city's area, or, when balanced, so each strip holds about the same number of blocks. */
+export function zoningCuts(segments: SegmentCollection, cols: number, rows: number, balanced = false): { xs: number[]; ys: number[] } {
   const [minX, minY, maxX, maxY] = bboxOf(segments);
   const vertical: number[] = [];
   const horizontal: number[] = [];
@@ -67,9 +68,15 @@ export function zoningCuts(segments: SegmentCollection, cols: number, rows: numb
     if (dy > dx * 4) vertical.push(Math.round(((x0 + x1) / 2) * 1e6) / 1e6);
     else if (dx > dy * 4) horizontal.push(Math.round(((y0 + y1) / 2) * 1e6) / 1e6);
   }
-  const inner = (min: number, max: number, n: number) => Array.from({ length: n - 1 }, (_, i) => min + ((max - min) * (i + 1)) / n);
-  const xs = [...new Set(snapCuts(vertical, inner(minX, maxX, cols)))];
-  const ys = [...new Set(snapCuts(horizontal, inner(minY, maxY, rows)))];
+  const middles = segments.features.map((f) => f.geometry.coordinates[Math.floor(f.geometry.coordinates.length / 2)]);
+  const quantiles = (values: number[], n: number) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    return Array.from({ length: n - 1 }, (_, i) => sorted[Math.floor((sorted.length * (i + 1)) / n)]);
+  };
+  const inner = (min: number, max: number, n: number, axis: 0 | 1) =>
+    balanced ? quantiles(middles.map((m) => m[axis]), n) : Array.from({ length: n - 1 }, (_, i) => min + ((max - min) * (i + 1)) / n);
+  const xs = [...new Set(snapCuts(vertical, inner(minX, maxX, cols, 0)))];
+  const ys = [...new Set(snapCuts(horizontal, inner(minY, maxY, rows, 1)))];
   return { xs: [minX - EDGE_MARGIN, ...xs, maxX + EDGE_MARGIN], ys: [minY - EDGE_MARGIN, ...ys, maxY + EDGE_MARGIN] };
 }
 
@@ -85,15 +92,22 @@ export type ZoningCollection = {
 type Pt = [number, number];
 const round7 = (n: number) => Math.round(n * 1e7) / 1e7;
 
-export function generateZoning(segments: SegmentCollection, cityId: string): ZoningCollection {
-  const { xs, ys } = zoningCuts(segments, ZONE_GRID[0].length, ZONE_GRID.length);
-  if (xs.length - 1 !== ZONE_GRID[0].length || ys.length - 1 !== ZONE_GRID.length) {
+/** One cell of a tiling: a closed ring. */
+export type Ring = Pt[];
+
+/**
+ * Tiles the whole city with cols x rows cells (rings[row][col], row 0 northernmost). Cut lines are snapped to real streets and
+ * every inner edge is wiggled by seeded points that both neighbours share, so there are no gaps and no overlaps.
+ * Balanced cuts give cells with about the same number of blocks, rather than the same area. A wiggle of 0 leaves the borders straight.
+ */
+export function tileCity(segments: SegmentCollection, cols: number, rows: number, rng: () => number, balanced = false, wiggle = WIGGLE_MAX): Ring[][] {
+  const { xs, ys } = zoningCuts(segments, cols, rows, balanced);
+  if (xs.length - 1 !== cols || ys.length - 1 !== rows) {
     throw new Error('Street snapping merged two cut lines; the segments do not look like a grid');
   }
-  const rng = mulberry32(SAMPLE_SEED);
   const width = (i: number) => xs[i + 1] - xs[i];
   const height = (j: number) => ys[j + 1] - ys[j];
-  const sideways = (a: number, b: number) => (rng() * 2 - 1) * WIGGLE_MAX * Math.min(a, b);
+  const sideways = (a: number, b: number) => (rng() * 2 - 1) * wiggle * Math.min(a, b);
 
   // h[j][i]: points strictly between corners (i, j) and (i + 1, j), west to east. v[i][j]: between (i, j) and (i, j + 1), south to north.
   const h = ys.map((y, j) =>
@@ -109,20 +123,28 @@ export function generateZoning(segments: SegmentCollection, cityId: string): Zon
     }),
   );
 
-  const features: ZoningCollection['features'] = [];
-  ZONE_GRID.forEach((rowCodes, r) => {
-    rowCodes.forEach((code, c) => {
+  return Array.from({ length: rows }, (_, r) =>
+    Array.from({ length: cols }, (_, c): Ring => {
       const jn = ys.length - 1 - r; // row 0 is the northernmost
       const js = jn - 1;
       const nw: Pt = [xs[c], ys[jn]];
       const ne: Pt = [xs[c + 1], ys[jn]];
       const se: Pt = [xs[c + 1], ys[js]];
       const sw: Pt = [xs[c], ys[js]];
-      const ring = [nw, ...h[jn][c], ne, ...[...v[c + 1][js]].reverse(), se, ...[...h[js][c]].reverse(), sw, ...v[c][js], nw];
+      return [nw, ...h[jn][c], ne, ...[...v[c + 1][js]].reverse(), se, ...[...h[js][c]].reverse(), sw, ...v[c][js], nw];
+    }),
+  );
+}
+
+export function generateZoning(segments: SegmentCollection, cityId: string): ZoningCollection {
+  const rings = tileCity(segments, ZONE_GRID[0].length, ZONE_GRID.length, mulberry32(SAMPLE_SEED));
+  const features: ZoningCollection['features'] = [];
+  ZONE_GRID.forEach((rowCodes, r) => {
+    rowCodes.forEach((code, c) => {
       features.push({
         type: 'Feature',
         properties: { zone_code: code, category: ZONING_CODES[code], name: `${ZONE_NAMES[code]} (${r + 1},${c + 1})`, city_id: cityId },
-        geometry: { type: 'Polygon', coordinates: [ring] },
+        geometry: { type: 'Polygon', coordinates: [rings[r][c]] },
       });
     });
   });

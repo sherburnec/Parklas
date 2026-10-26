@@ -2,14 +2,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { SegmentCollection } from './build.ts';
-import { cellOf, sidePoint } from './sample-data.ts';
+import { bboxOf, cellOf, sidePoint } from './sample-data.ts';
 import { generatePermitZones, permitZonesToJson } from './sample-permit-zones.ts';
-import { generateZoning } from './sample-zoning.ts';
 
 const data = resolve(import.meta.dirname, '..', '..', 'data');
 const real = JSON.parse(readFileSync(resolve(data, 'burbank', 'segments.geojson'), 'utf8')) as SegmentCollection;
-const zoning = generateZoning(real, 'burbank-sample');
-const zones = generatePermitZones(real, zoning, 'burbank-sample');
+const zones = generatePermitZones(real, 'burbank-sample');
 
 type Ring = number[][];
 const ringOf = (i: number): Ring => zones.features[i].geometry.coordinates[0];
@@ -30,7 +28,10 @@ function crosses(a: number[], b: number[], c: number[], d: number[]): boolean {
   return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0;
 }
 
-describe('generatePermitZones (TD-8)', () => {
+const allSides = () => real.features.flatMap((s) => (['L', 'R'] as const).map((side) => ({ id: `${s.properties.segment_id} ${side}`, at: sidePoint(s, side) })));
+const zonesHolding = (x: number, y: number) => zones.features.filter((f) => inRing(x, y, f.geometry.coordinates[0]));
+
+describe('generatePermitZones (TD-8, TD-8.2)', () => {
   it('makes 8 zones coded DEMO-A to DEMO-H, with the sample city id', () => {
     expect(zones.features.map((f) => f.properties.permit_code)).toEqual(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((l) => `DEMO-${l}`));
     for (const f of zones.features) {
@@ -41,17 +42,15 @@ describe('generatePermitZones (TD-8)', () => {
   });
 
   it('is repeatable', () => {
-    expect(generatePermitZones(real, zoning, 'burbank-sample')).toEqual(zones);
+    expect(generatePermitZones(real, 'burbank-sample')).toEqual(zones);
   });
 
-  it('gives closed, single-ring polygons that follow street lines (every vertex is a street vertex)', () => {
-    const streetPoints = new Set(real.features.flatMap((f) => f.geometry.coordinates.map((c) => c.join())));
+  it('gives closed, single-ring polygons', () => {
     for (const f of zones.features) {
       expect(f.geometry.coordinates).toHaveLength(1);
       const ring = f.geometry.coordinates[0];
       expect(ring.length).toBeGreaterThanOrEqual(4);
       expect(ring[0]).toEqual(ring[ring.length - 1]);
-      for (const p of ring) expect(streetPoints.has(p.join()), `${f.properties.permit_code} ${p}`).toBe(true);
     }
   });
 
@@ -67,35 +66,32 @@ describe('generatePermitZones (TD-8)', () => {
         }
       }
     }
-    for (const s of real.features) {
-      for (const side of ['L', 'R'] as const) {
-        const [x, y] = sidePoint(s, side);
-        const hits = zones.features.filter((f) => inRing(x, y, f.geometry.coordinates[0]));
-        expect(hits.length, `${s.properties.segment_id} ${side}`).toBeLessThanOrEqual(1);
+    for (const { id, at } of allSides()) expect(zonesHolding(...at).length, id).toBeLessThanOrEqual(1);
+  });
+
+  it('puts every side of every block in a zone, so no permit_zone is null', () => {
+    for (const { id, at } of allSides()) expect(zonesHolding(...at).length, id).toBe(1);
+  });
+
+  it('covers the whole city: every point on a grid over it is in exactly one zone', () => {
+    const [minX, minY, maxX, maxY] = bboxOf(real);
+    const n = 80;
+    for (let i = 0; i <= n; i++) {
+      for (let j = 0; j <= n; j++) {
+        const x = minX + ((maxX - minX) * i) / n;
+        const y = minY + ((maxY - minY) * j) / n;
+        expect(zonesHolding(x, y).length, `${x},${y}`).toBe(1);
       }
     }
   });
 
-  it('makes at least two zones share an edge', () => {
+  it('makes every zone share an edge with another zone', () => {
     const edges = (ring: Ring) => new Set(ring.slice(1).map((p, i) => [ring[i].join(), p.join()].sort().join('>')));
-    const shared = (a: number, b: number) => [...edges(ringOf(a))].filter((e) => edges(ringOf(b)).has(e)).length;
-    let pairs = 0;
-    for (let a = 0; a < 8; a++) for (let b = a + 1; b < 8; b++) if (shared(a, b) > 0) pairs++;
-    expect(pairs).toBeGreaterThanOrEqual(1);
-  });
-
-  it('leaves most of the city outside any zone', () => {
-    let inside = 0;
-    let total = 0;
-    for (const s of real.features) {
-      for (const side of ['L', 'R'] as const) {
-        const [x, y] = sidePoint(s, side);
-        total++;
-        if (zones.features.some((f) => inRing(x, y, f.geometry.coordinates[0]))) inside++;
-      }
+    for (let a = 0; a < 8; a++) {
+      const mine = edges(ringOf(a));
+      const touches = [0, 1, 2, 3, 4, 5, 6, 7].some((b) => b !== a && [...edges(ringOf(b))].some((e) => mine.has(e)));
+      expect(touches, zones.features[a].properties.permit_code).toBe(true);
     }
-    expect(inside / total).toBeGreaterThan(0.05);
-    expect(inside / total).toBeLessThan(0.3);
   });
 
   it('spreads zones over at least 4 separate parts of the city', () => {
@@ -109,25 +105,11 @@ describe('generatePermitZones (TD-8)', () => {
     expect(cells.size).toBeGreaterThanOrEqual(4);
   });
 
-  it('puts most of each zone inside SAMPLE- residential zoning', () => {
-    const residential = zoning.features.filter((z) => z.properties.category === 'residential');
-    let inZones = 0;
-    let resi = 0;
-    for (const s of real.features) {
-      for (const side of ['L', 'R'] as const) {
-        const [x, y] = sidePoint(s, side);
-        if (!zones.features.some((f) => inRing(x, y, f.geometry.coordinates[0]))) continue;
-        inZones++;
-        if (residential.some((z) => inRing(x, y, z.geometry.coordinates[0]))) resi++;
-      }
-    }
-    expect(resi / inZones).toBeGreaterThan(0.7);
-  });
-
-  it('gives every zone some street sides', () => {
+  it('gives every zone a real share of the street sides', () => {
+    const sides = allSides();
     for (const f of zones.features) {
-      const n = real.features.flatMap((s) => (['L', 'R'] as const).map((side) => sidePoint(s, side))).filter(([x, y]) => inRing(x, y, f.geometry.coordinates[0])).length;
-      expect(n, f.properties.permit_code).toBeGreaterThanOrEqual(10);
+      const n = sides.filter(({ at }) => inRing(at[0], at[1], f.geometry.coordinates[0])).length;
+      expect(n / sides.length, f.properties.permit_code).toBeGreaterThan(0.02);
     }
   });
 

@@ -127,7 +127,7 @@ const SLIVER_CHECKS: EdgeCheck[] = [
 const mapLayerOf = (r: Pick<RuleRow, 'layer' | 'type'>): string => (r.layer === 'restrictions' && r.type !== 'no_parking' ? 'no_stopping_standing' : r.layer);
 
 /** Layers tried in turn for the sliver's rule: the first that the block has no row in. */
-const SLIVER_LAYERS: RuleRow['layer'][] = ['curb_color', 'sweeping', 'timed_parking', 'restrictions'];
+const SLIVER_LAYERS: RuleRow['layer'][] = ['curb_color', 'timed_parking', 'restrictions']; // not sweeping: Burbank sweeps on weekdays only (TD-4), and this rule is on Saturday and Sunday
 
 function sliverRow(layer: RuleRow['layer']): Omit<RuleRow, 'segment_id' | 'side'> {
   switch (layer) {

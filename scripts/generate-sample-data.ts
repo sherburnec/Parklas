@@ -1,6 +1,6 @@
 // Write data/burbank-sample/rules.csv (made-up rules on TARGET_MAPPED_SHARE of Burbank segments, tasks TD-2 and TD-2.2)
 // zoning.geojson + zoning-categories.json (SAMPLE- zones tiling the whole city, task TD-3),
-// permit-zones.geojson (8 DEMO- permit zones grown from city blocks, task TD-8)
+// permit-zones.geojson (8 DEMO- permit zones tiling the whole city, tasks TD-8 and TD-8.2)
 // curb-colors.json (the five sample curb colors, task TD-7)
 // and test-cases.md (the fixed edge-case sides at the end of rules.csv, with their expected results, task TD-9).
 //
@@ -24,7 +24,7 @@ const segments = JSON.parse(readFileSync(resolve(root, 'data', 'burbank', 'segme
 const trim = JSON.parse(readFileSync(resolve(root, 'data', 'burbank', 'trim.json'), 'utf8')) as TrimData;
 
 const zoning = generateZoning(segments, 'burbank-sample');
-const permitZones = generatePermitZones(segments, zoning, 'burbank-sample');
+const permitZones = generatePermitZones(segments, 'burbank-sample');
 writeFileSync(resolve(root, 'data', 'burbank-sample', 'permit-zones.geojson'), permitZonesToJson(permitZones));
 console.log(`burbank-sample/permit-zones.geojson: ${permitZones.features.length} zones`);
 
